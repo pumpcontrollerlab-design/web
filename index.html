@@ -3,344 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMART Irrigation System Pro</title>
+    <title>Smart Irrigation Pro - Dashboard</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
-        :root {
-            --primary: #0ea5e9; --primary-dark: #0284c7;
-            --success: #22c55e; --danger: #ef4444; --warning: #f59e0b;
-            --bg-color: #f8fafc; --card-bg: #ffffff;
-            --text-main: #334155; --text-light: #64748b; --border: #e2e8f0;
-        }
-
-        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { max-width: 900px; width: 100%; }
-        .hidden { display: none !important; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: auto; }
+        h1, h2, h3 { color: #2c3e50; text-align: center; }
         
-        /* Header */
-        .header { text-align: center; padding: 10px 0 20px 0; margin-bottom: 20px; position: relative; }
-        .header h1 { color: var(--primary-dark); margin: 0; font-size: 28px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         
-        .nav-btn { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%; transition: background 0.2s; box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.3); margin-top: 10px; }
-        .nav-btn:hover { background: var(--primary-dark); }
-        .back-btn { position: absolute; left: 0; top: 15px; background: none; border: none; color: var(--primary); font-size: 16px; font-weight: bold; cursor: pointer; }
+        /* Status Indicators */
+        .status-row { display: flex; justify-content: space-around; font-weight: bold; margin-bottom: 10px; }
+        .status-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; background: #ccc; }
+        .dot-on { background: #27ae60; box-shadow: 0 0 8px #27ae60; }
         
-        .emergency-btn { background: var(--danger); color: white; border: none; padding: 15px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 18px; width: 100%; margin-top: 20px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); text-transform: uppercase; letter-spacing: 2px;}
-        .emergency-btn:hover { background: #dc2626; }
-
-        /* Dashboard Info Cards */
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .info-card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); text-align: center; }
-        .info-title { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;}
-        .info-value { font-size: 16px; font-weight: bold; }
-        .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; transition: all 0.3s; }
-        .online { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
-        .offline { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        /* Buttons */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        button { padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .btn-irr { background: #3498db; color: white; }
+        .btn-fert { background: #9b59b6; color: white; }
+        .btn-off { background: #bdc3c7; color: #333; }
+        .btn-active { box-shadow: inset 0 0 0 3px #2c3e50; filter: brightness(1.1); }
+        .btn-danger { background: #e74c3c; color: white; width: 100%; padding: 15px; font-size: 18px; margin-top: 10px; }
         
-        /* Zones & Fertilizer Grids */
-        .section-box { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
-        .section-header { font-weight: bold; margin-bottom: 15px; font-size: 16px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
-        .zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .zone-btn { background: var(--bg-color); color: var(--text-main); border: 2px solid var(--border); text-align: center; padding: 15px 0; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-        .zone-btn:hover:not(:disabled) { border-color: var(--primary); }
-        .zone-btn.active { background: var(--success); color: white; border-color: var(--success); box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
-        .zone-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #e2e8f0; border-color: #cbd5e1; }
-        .fert-btn.active { background: var(--warning); color: white; border-color: var(--warning); box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
-
-        /* Scheduling System */
-        .schedule-card { background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 5px; font-weight: bold; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+        /* Schedule Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background: #ecf0f1; }
+        input[type="number"] { width: 60px; padding: 5px; text-align: center; }
+        select { padding: 5px; }
         
-        .week-selector { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
-        .day-btn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: white; font-size: 12px; font-weight: bold; cursor: pointer; }
-        .day-btn.selected { background: var(--primary); color: white; border-color: var(--primary); }
-
-        .duration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .duration-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 13px; }
-        .duration-input { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
+        /* Time & Days */
+        .schedule-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
+        .days-group label { margin-right: 8px; font-size: 14px; }
+        .save-btn { background: #2ecc71; color: white; font-size: 16px; padding: 10px 20px; }
         
-        .save-btn { width: 100%; background: var(--success); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .clear-btn { width: 100%; background: #fee2e2; color: var(--danger); border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .heartbeat { text-align: center; font-size: 12px; color: #7f8c8d; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="dashboard-page">
-        <div class="header">
-            <h1>💧 SMART Irrigation Pro</h1>
-        </div>
+    <h1>🌱 Smart Irrigation Pro</h1>
+    <div class="heartbeat" id="heartbeat-display">ESP32 Status: Checking...</div>
 
-        <div class="info-grid">
-            <div class="info-card">
-                <div class="info-title">System Status</div>
-                <div class="info-value">
-                    <span id="status-dot" class="status-dot offline"></span>
-                    <span id="status-text">Offline</span>
-                </div>
-            </div>
-            <div class="info-card">
-                <div class="info-title">Main Pump (Delay)</div>
-                <div class="info-value" id="pump-status-text">Standby ⚪</div>
-            </div>
-            <div class="info-card">
-                <div class="info-title">Ferti Pump (Delay)</div>
-                <div class="info-value" id="fert-pump-status-text">Standby ⚪</div>
-            </div>
+    <div class="card">
+        <h2>Live System Status</h2>
+        <div class="status-row">
+            <div><span class="status-dot" id="dot-main-pump"></span> Main Pump</div>
+            <div><span class="status-dot" id="dot-fert-pump"></span> Fert Pump</div>
         </div>
-
-        <div class="section-box">
-            <div class="section-header">Irrigation Zones (1-6) <span style="font-size:12px; font-weight:normal;">- Select 1 max</span></div>
-            <div class="zone-grid" id="irrigation-grid">
-                </div>
-        </div>
-
-        <div class="section-box">
-            <div class="section-header">Fertilizer Compartments (1-4) <span style="font-size:12px; font-weight:normal;">- Requires Main Pump to be ON</span></div>
-            <div class="zone-grid" id="fertilizer-grid" style="grid-template-columns: repeat(2, 1fr);">
-                </div>
-        </div>
-
-        <button class="nav-btn" onclick="openSchedulingPage()">📅 Manage Schedules</button>
-        <button class="emergency-btn" onclick="triggerEmergencyStop()">🛑 EMERGENCY STOP</button>
     </div>
 
-    <div id="scheduling-page" class="hidden">
-        <div class="header">
-            <button class="back-btn" onclick="openDashboardPage()">&#8592; Back</button>
-            <h1>📅 Setup Schedules</h1>
-            <p style="color: var(--text-light); font-size: 14px;">Select up to 3 schedules. Zones execute sequentially.</p>
+    <div class="card">
+        <h2>Manual Control</h2>
+        
+        <h3>Irrigation Zones</h3>
+        <div class="grid">
+            <button class="btn-irr" id="btn-irr-1" onclick="setManualIrr(1)">Zone 1</button>
+            <button class="btn-irr" id="btn-irr-2" onclick="setManualIrr(2)">Zone 2</button>
+            <button class="btn-irr" id="btn-irr-3" onclick="setManualIrr(3)">Zone 3</button>
+            <button class="btn-irr" id="btn-irr-4" onclick="setManualIrr(4)">Zone 4</button>
+            <button class="btn-irr" id="btn-irr-5" onclick="setManualIrr(5)">Zone 5</button>
+            <button class="btn-irr" id="btn-irr-6" onclick="setManualIrr(6)">Zone 6</button>
+            <button class="btn-off" onclick="setManualIrr(0)">Turn All OFF</button>
         </div>
 
-        <div id="schedules-container">
-            </div>
+        <h3>Fertilizer Compartments</h3>
+        <div class="grid">
+            <button class="btn-fert" id="btn-fert-1" onclick="setManualFert(1)">Comp 1</button>
+            <button class="btn-fert" id="btn-fert-2" onclick="setManualFert(2)">Comp 2</button>
+            <button class="btn-fert" id="btn-fert-3" onclick="setManualFert(3)">Comp 3</button>
+            <button class="btn-fert" id="btn-fert-4" onclick="setManualFert(4)">Comp 4</button>
+            <button class="btn-off" onclick="setManualFert(0)">Turn All OFF</button>
+        </div>
 
+        <button class="btn-danger" onclick="triggerEmergencyStop()">🚨 EMERGENCY STOP 🚨</button>
+    </div>
+
+    <div class="card">
+        <h2>Master Schedule Configuration</h2>
+        
+        <div class="schedule-header">
+            <div>
+                <label><b>Enable Schedule:</b> <input type="checkbox" id="sched-active"></label>
+            </div>
+            <div>
+                <b>Start Time: </b> 
+                <input type="number" id="sched-hour" min="0" max="23" placeholder="HH"> : 
+                <input type="number" id="sched-minute" min="0" max="59" placeholder="MM">
+            </div>
+        </div>
+
+        <div class="days-group">
+            <b>Days:</b>
+            <label><input type="checkbox" class="day-cb" value="1"> Sun</label>
+            <label><input type="checkbox" class="day-cb" value="2"> Mon</label>
+            <label><input type="checkbox" class="day-cb" value="4"> Tue</label>
+            <label><input type="checkbox" class="day-cb" value="8"> Wed</label>
+            <label><input type="checkbox" class="day-cb" value="16"> Thu</label>
+            <label><input type="checkbox" class="day-cb" value="32"> Fri</label>
+            <label><input type="checkbox" class="day-cb" value="64"> Sat</label>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Zone</th>
+                    <th>Water (Mins)</th>
+                    <th>Fertilizer (Mins)</th>
+                    <th>Fertilizer Source</th>
+                </tr>
+            </thead>
+            <tbody id="schedule-body">
+                </tbody>
+        </table>
+
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="save-btn" onclick="saveSchedule()">💾 Save Master Schedule</button>
+        </div>
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script>
-    // 1. FIREBASE INITIALIZATION
+    // 1. Firebase Configuration (Already securely matched to your ESP32)
     const firebaseConfig = {
         apiKey: "AIzaSyAbfqRl4T3cv6cjZz9wT9J9cOjOenp-UJY",
-        authDomain: "smart-irrigation-c039f.firebaseapp.com",
-        databaseURL: "https://smart-irrigation-c039f-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "smart-irrigation-c039f",
-        storageBucket: "smart-irrigation-c039f.firebasestorage.app",
-        messagingSenderId: "322853251796",
-        appId: "1:322853251796:web:881979f2aa261bb0b4a941",
-        measurementId: "G-3T9E62SHQJ"
+        databaseURL: "https://smart-irrigation-c039f-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
+
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+    const db = firebase.database();
 
-    // 2. UI NAVIGATION
-    function openSchedulingPage() { document.getElementById('dashboard-page').classList.add('hidden'); document.getElementById('scheduling-page').classList.remove('hidden'); }
-    function openDashboardPage() { document.getElementById('scheduling-page').classList.add('hidden'); document.getElementById('dashboard-page').classList.remove('hidden'); }
-
-    // Generate Irrigation & Fert Buttons
-    const irrGrid = document.getElementById('irrigation-grid');
-    for(let i = 1; i <= 6; i++) { irrGrid.innerHTML += `<button id="btn-irr-${i}" class="zone-btn" onclick="setManualIrrZone(${i})">Zone ${i}</button>`; }
-    
-    const fertGrid = document.getElementById('fertilizer-grid');
-    for(let i = 1; i <= 4; i++) { fertGrid.innerHTML += `<button id="btn-fert-${i}" class="zone-btn fert-btn" onclick="setManualFertZone(${i})" disabled>Compartment ${i}</button>`; }
-
-    // Generate 3 Schedule Cards
-    const schedContainer = document.getElementById('schedules-container');
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    for(let s = 1; s <= 3; s++) {
-        let irrHTML = '', fertHTML = '';
-        for(let i=1; i<=6; i++) irrHTML += `<div class="duration-row"><span>Zone ${i}</span><div><input type="number" id="s${s}-i${i}" class="duration-input" value="0" min="0"> m</div></div>`;
-        for(let i=1; i<=4; i++) fertHTML += `<div class="duration-row"><span>Comp ${i}</span><div><input type="number" id="s${s}-f${i}" class="duration-input" value="0" min="0"> m</div></div>`;
-
-        let daysHTML = `<button type="button" class="day-btn" id="s${s}-daily" onclick="toggleDaily(${s})">Daily</button>`;
-        for(let d=0; d<7; d++) {
-            daysHTML += `<button type="button" class="day-btn day-toggle-${s}" data-val="${Math.pow(2, d)}" onclick="this.classList.toggle('selected'); checkDaily(${s});">${days[d]}</button>`;
-        }
-
-        schedContainer.innerHTML += `
-            <div class="schedule-card">
-                <h3 style="margin-top:0; color:var(--primary-dark)">Schedule ${s}</h3>
-                
-                <div class="form-group">
-                    <label>Active Days</label>
-                    <div class="week-selector">${daysHTML}</div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Start Time</label>
-                    <input type="time" id="s${s}-time" class="form-control" value="06:00">
-                </div>
-
-                <div class="duration-grid">
-                    <div>
-                        <label>Irrigation Mins</label>
-                        ${irrHTML}
-                    </div>
-                    <div>
-                        <label>Fertilizer Mins</label>
-                        ${fertHTML}
-                    </div>
-                </div>
-                <button class="save-btn" onclick="saveSchedule(${s})">Save Schedule ${s}</button>
-                <button class="clear-btn" onclick="clearSchedule(${s})">Clear / Disable Schedule ${s}</button>
-            </div>
+    // Generate Schedule Table Rows
+    const tbody = document.getElementById('schedule-body');
+    for(let i=0; i<6; i++) {
+        tbody.innerHTML += `
+            <tr>
+                <td><b>Zone ${i+1}</b></td>
+                <td><input type="number" id="irrDur-${i}" min="0" value="0"></td>
+                <td><input type="number" id="fertDur-${i}" min="0" value="0"></td>
+                <td>
+                    <select id="fertZone-${i}">
+                        <option value="0">None</option>
+                        <option value="1">Comp 1</option>
+                        <option value="2">Comp 2</option>
+                        <option value="3">Comp 3</option>
+                        <option value="4">Comp 4</option>
+                    </select>
+                </td>
+            </tr>
         `;
     }
 
-    // 3. MANUAL CONTROL LOGIC
-    function setManualIrrZone(zoneNum) {
-        const btn = document.getElementById(`btn-irr-${zoneNum}`);
-        database.ref('system/manualIrrZone').set(btn.classList.contains('active') ? 0 : zoneNum);
+    // --- WRITE FUNCTIONS ---
+
+    function setManualIrr(zoneNum) {
+        db.ref('system/manualIrrZone').set(zoneNum);
     }
 
-    function setManualFertZone(zoneNum) {
-        const btn = document.getElementById(`btn-fert-${zoneNum}`);
-        database.ref('system/manualFertZone').set(btn.classList.contains('active') ? 0 : zoneNum);
+    function setManualFert(zoneNum) {
+        db.ref('system/manualFertZone').set(zoneNum);
     }
 
-    // 4. EMERGENCY STOP
     function triggerEmergencyStop() {
-        if(confirm("⚠️ EMERGENCY STOP ⚠️\n\nAre you sure you want to completely STOP all active pumps, zones, and schedules immediately?")) {
-            database.ref('system/emergencyStop').set(true);
-            alert("Stop Command Sent to ESP32!");
+        if(confirm("Are you sure you want to stop all pumps and clear manual overrides?")) {
+            db.ref('system/emergencyStop').set(true);
         }
     }
 
-    // 5. FIREBASE LISTENERS (Real-time UI updates)
-    database.ref('system/pump1Active').on('value', (snap) => {
-        const active = snap.val();
-        document.getElementById('pump-status-text').innerHTML = active ? "<span style='color: var(--success)'>Running 🟢</span>" : "Standby ⚪";
-        
-        // INTERLOCK: Only enable fertilizer buttons if Main Pump is officially running
-        for(let i = 1; i <= 4; i++) {
-            const fertBtn = document.getElementById(`btn-fert-${i}`);
-            fertBtn.disabled = !active;
-            if(!active) fertBtn.classList.remove('active'); // Visually turn off if pump stops
-        }
-    });
-
-    database.ref('system/fertPumpActive').on('value', (snap) => {
-        const active = snap.val();
-        document.getElementById('fert-pump-status-text').innerHTML = active ? "<span style='color: var(--success)'>Running 🟢</span>" : "Standby ⚪";
-    });
-
-    database.ref('system/activeIrrZone').on('value', (snap) => {
-        const activeZone = snap.val() || 0;
-        for(let i = 1; i <= 6; i++) {
-            const btn = document.getElementById(`btn-irr-${i}`);
-            if (i === activeZone) { btn.classList.add('active'); btn.innerText = `Zone ${i} (ON)`; }
-            else { btn.classList.remove('active'); btn.innerText = `Zone ${i}`; }
-        }
-    });
-
-    database.ref('system/activeFertZone').on('value', (snap) => {
-        const activeFert = snap.val() || 0;
-        for(let i = 1; i <= 4; i++) {
-            const btn = document.getElementById(`btn-fert-${i}`);
-            if (i === activeFert) { btn.classList.add('active'); btn.innerText = `Comp ${i} (ON)`; }
-            else { btn.classList.remove('active'); btn.innerText = `Comp ${i}`; }
-        }
-    });
-
-    // 6. SCHEDULING LOGIC (Converting to Data for ESP32)
-    function toggleDaily(s) {
-        const dailyBtn = document.getElementById(`s${s}-daily`);
-        const dayBtns = document.querySelectorAll(`.day-toggle-${s}`);
-        const isDaily = !dailyBtn.classList.contains('selected');
-        
-        if (isDaily) {
-            dailyBtn.classList.add('selected');
-            dayBtns.forEach(b => b.classList.add('selected'));
-        } else {
-            dailyBtn.classList.remove('selected');
-            dayBtns.forEach(b => b.classList.remove('selected'));
-        }
-    }
-
-    function checkDaily(s) {
-        const dailyBtn = document.getElementById(`s${s}-daily`);
-        const dayBtns = document.querySelectorAll(`.day-toggle-${s}`);
-        let allSelected = true;
-        dayBtns.forEach(b => { if(!b.classList.contains('selected')) allSelected = false; });
-        if(allSelected) dailyBtn.classList.add('selected');
-        else dailyBtn.classList.remove('selected');
-    }
-
-    function saveSchedule(s) {
-        let bitmask = 0;
-        document.querySelectorAll(`.day-toggle-${s}`).forEach(b => {
-            if(b.classList.contains('selected')) bitmask += parseInt(b.getAttribute('data-val'));
+    function saveSchedule() {
+        let daysMask = 0;
+        document.querySelectorAll('.day-cb').forEach(cb => {
+            if(cb.checked) daysMask += parseInt(cb.value);
         });
 
-        if (bitmask === 0) { alert("Please select at least one day of the week!"); return; }
+        let scheduleData = {
+            active: document.getElementById('sched-active').checked,
+            hour: parseInt(document.getElementById('sched-hour').value) || 0,
+            minute: parseInt(document.getElementById('sched-minute').value) || 0,
+            days: daysMask,
+            irrDur: [],
+            fertDur: [],
+            fertZone: []
+        };
 
-        const timeStr = document.getElementById(`s${s}-time`).value;
-        const [hour, minute] = timeStr.split(':').map(Number);
+        for(let i=0; i<6; i++) {
+            scheduleData.irrDur.push(parseInt(document.getElementById(`irrDur-${i}`).value) || 0);
+            scheduleData.fertDur.push(parseInt(document.getElementById(`fertDur-${i}`).value) || 0);
+            scheduleData.fertZone.push(parseInt(document.getElementById(`fertZone-${i}`).value) || 0);
+        }
 
-        let irrArr = [], fertArr = [];
-        for(let i=1; i<=6; i++) irrArr.push(parseInt(document.getElementById(`s${s}-i${i}`).value) || 0);
-        for(let i=1; i<=4; i++) fertArr.push(parseInt(document.getElementById(`s${s}-f${i}`).value) || 0);
-
-        database.ref(`schedules/s${s}`).set({
-            active: true,
-            days: bitmask,
-            hour: hour,
-            minute: minute,
-            irrDur: irrArr,
-            fertDur: fertArr
-        }).then(() => { alert(`Schedule ${s} Saved! ESP32 will execute this automatically.`); });
-    }
-
-    function clearSchedule(s) {
-        database.ref(`schedules/s${s}/active`).set(false).then(() => {
-            document.querySelectorAll(`.day-toggle-${s}`).forEach(b => b.classList.remove('selected'));
-            document.getElementById(`s${s}-daily`).classList.remove('selected');
-            for(let i=1; i<=6; i++) document.getElementById(`s${s}-i${i}`).value = 0;
-            for(let i=1; i<=4; i++) document.getElementById(`s${s}-f${i}`).value = 0;
-            alert(`Schedule ${s} is now disabled and cleared.`);
+        db.ref('schedule').set(scheduleData).then(() => {
+            alert("Master Schedule Saved Successfully!");
+        }).catch((error) => {
+            alert("Error saving: " + error);
         });
     }
 
-    // LOAD SCHEDULES FROM FIREBASE ON BOOT
-    database.ref('schedules').once('value', (snap) => {
-        if(snap.exists()) {
-            const data = snap.val();
-            for(let s=1; s<=3; s++) {
-                if(data[`s${s}`] && data[`s${s}`].active) {
-                    let sched = data[`s${s}`];
-                    document.getElementById(`s${s}-time`).value = `${String(sched.hour).padStart(2,'0')}:${String(sched.minute).padStart(2,'0')}`;
-                    
-                    document.querySelectorAll(`.day-toggle-${s}`).forEach(b => {
-                        let val = parseInt(b.getAttribute('data-val'));
-                        if((sched.days & val) === val) b.classList.add('selected');
-                    });
-                    checkDaily(s);
+    // --- READ FUNCTIONS (Live Updates) ---
 
-                    for(let i=0; i<6; i++) document.getElementById(`s${s}-i${i+1}`).value = sched.irrDur ? sched.irrDur[i] : 0;
-                    for(let i=0; i<4; i++) document.getElementById(`s${s}-f${i+1}`).value = sched.fertDur ? sched.fertDur[i] : 0;
-                }
+    // Listen to System Status
+    db.ref('system').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        
+        // Manual Irrigation Buttons
+        for(let i=1; i<=6; i++) {
+            let btn = document.getElementById(`btn-irr-${i}`);
+            if (data.manualIrrZone === i) {
+                btn.style.filter = "brightness(0.7)";
+                btn.innerText = `Zone ${i} (ON)`;
+            } else {
+                btn.style.filter = "brightness(1)";
+                btn.innerText = `Zone ${i}`;
             }
         }
+
+        // Manual Fert Buttons
+        for(let i=1; i<=4; i++) {
+            let btn = document.getElementById(`btn-fert-${i}`);
+            if (data.manualFertZone === i) {
+                btn.style.filter = "brightness(0.7)";
+                btn.innerText = `Comp ${i} (ON)`;
+            } else {
+                btn.style.filter = "brightness(1)";
+                btn.innerText = `Comp ${i}`;
+            }
+        }
+
+        // Pump Dots
+        document.getElementById('dot-main-pump').className = data.pump1Active ? "status-dot dot-on" : "status-dot";
+        document.getElementById('dot-fert-pump').className = data.fertPumpActive ? "status-dot dot-on" : "status-dot";
+
+        // Heartbeat logic
+        let now = Math.floor(Date.now() / 1000);
+        let diff = now - (data.heartbeat || 0);
+        if (diff < 15) {
+            document.getElementById('heartbeat-display').innerHTML = "🟢 ESP32 is Online & Connected";
+            document.getElementById('heartbeat-display').style.color = "#27ae60";
+        } else {
+            document.getElementById('heartbeat-display').innerHTML = "🔴 ESP32 is Offline (Last seen " + diff + " seconds ago)";
+            document.getElementById('heartbeat-display').style.color = "#e74c3c";
+        }
     });
 
-    // 7. HEARTBEAT
-    let lastEsp32Heartbeat = 0; 
-    database.ref('system/heartbeat').on('value', snap => { if(snap.exists()) lastEsp32Heartbeat = snap.val(); });
-    setInterval(() => {
-        const dot = document.getElementById('status-dot');
-        const text = document.getElementById('status-text');
-        if ((Math.floor(Date.now() / 1000) - lastEsp32Heartbeat) < 15) {
-            dot.className = "status-dot online"; text.innerText = "Online";
-        } else {
-            dot.className = "status-dot offline"; text.innerText = "Offline";
+    // Load Schedule Data into UI exactly once on page load
+    db.ref('schedule').once('value', (snapshot) => {
+        const sched = snapshot.val();
+        if(!sched) return;
+
+        document.getElementById('sched-active').checked = sched.active || false;
+        document.getElementById('sched-hour').value = sched.hour || 0;
+        document.getElementById('sched-minute').value = sched.minute || 0;
+
+        document.querySelectorAll('.day-cb').forEach(cb => {
+            let val = parseInt(cb.value);
+            cb.checked = (sched.days & val) === val;
+        });
+
+        for(let i=0; i<6; i++) {
+            if(sched.irrDur) document.getElementById(`irrDur-${i}`).value = sched.irrDur[i] || 0;
+            if(sched.fertDur) document.getElementById(`fertDur-${i}`).value = sched.fertDur[i] || 0;
+            if(sched.fertZone) document.getElementById(`fertZone-${i}`).value = sched.fertZone[i] || 0;
         }
-    }, 2000);
+    });
+
+    // Check heartbeat continuously
+    setInterval(() => {
+        db.ref('system/heartbeat').once('value').then((snapshot) => {
+             let now = Math.floor(Date.now() / 1000);
+             let diff = now - (snapshot.val() || 0);
+             if(diff >= 15) {
+                 document.getElementById('heartbeat-display').innerHTML = "🔴 ESP32 is Offline (No heartbeat)";
+                 document.getElementById('heartbeat-display').style.color = "#e74c3c";
+             }
+        });
+    }, 5000);
 
 </script>
 </body>

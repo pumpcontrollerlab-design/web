@@ -121,12 +121,12 @@
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary);
         }
-        .schedule-info h4 { margin: 0 0 5px 0; font-size: 18px; }
-        .schedule-info p { margin: 0; font-size: 13px; color: var(--text-muted); }
+        .schedule-info h4 { margin: 0 0 8px 0; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+        .schedule-info p { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
         
         .btn-create {
             background: var(--primary); color: white; border: none; padding: 16px; width: 100%;
-            border-radius: 16px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px;
+            border-radius: 16px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; margin-bottom: 40px;
         }
 
         /* Form styling */
@@ -201,7 +201,8 @@
         </div>
         <div class="container">
             <div id="active-schedules-list">
-                </div>
+                <p style="text-align:center; color:#888; margin-top:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
+            </div>
             <button class="btn-create" onclick="openScheduleCreator()"><i class="fa-solid fa-plus"></i> Create New Schedule</button>
         </div>
     </div>
@@ -299,7 +300,6 @@
     }
     document.getElementById('zone-config-container').innerHTML = zConfigHTML;
 
-    // Logic to dynamically add up to 4 fertilizer rows per zone
     let fertCounts = [0,0,0,0,0,0];
     function addFertRow(zoneIdx) {
         if(fertCounts[zoneIdx] >= 4) { alert("Maximum 4 fertilizers allowed per zone."); return; }
@@ -332,7 +332,6 @@
     function removeFertRow(zoneIdx, rowId) {
         let el = document.getElementById(`frow-${zoneIdx}-${rowId}`);
         if(el) el.remove();
-        // We don't decrement count to avoid ID collisions on save, we just ignore missing elements.
     }
 
     // --- 4. MODAL NAVIGATION ---
@@ -340,7 +339,6 @@
     function closeScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'none'; }
     
     function openScheduleCreator() { 
-        // Reset form
         document.getElementById('sched-time').value = "";
         document.querySelectorAll('.m-day').forEach(cb => cb.checked = false);
         for(let z=0; z<6; z++) {
@@ -404,35 +402,55 @@
         else { hb.innerHTML = "🔴 System Offline"; hb.style.color = "var(--danger)"; }
     });
 
-    // Load Schedules into the Hub
+    // --- THE FIX: SAFELY LOAD SCHEDULES LIST ---
     db.ref('schedules').on('value', (snap) => {
         const listDiv = document.getElementById('active-schedules-list');
         listDiv.innerHTML = "";
-        const schedules = snap.val() || [];
         
-        if(schedules.length === 0 || !schedules[0]) {
-            listDiv.innerHTML = `<p style="text-align:center; color:#888; margin-bottom:20px;">No active schedules.</p>`;
+        if (!snap.exists()) {
+            listDiv.innerHTML = `<p style="text-align:center; color:#888; margin-top:20px;">No active schedules. Click below to create one!</p>`;
             return;
         }
 
-        schedules.forEach((sched, index) => {
-            if(!sched) return;
+        let hasSchedules = false;
+
+        // Using snap.forEach fixes the Firebase array/object conversion bug!
+        snap.forEach((childSnap) => {
+            let index = childSnap.key;
+            let sched = childSnap.val();
+            
+            // Ignore corrupted or empty data
+            if (!sched || sched.hour === undefined) return;
+            hasSchedules = true;
+
             let hh = String(sched.hour).padStart(2, '0');
             let mm = String(sched.minute).padStart(2, '0');
+            
+            // Convert bitmask back to readable day names
+            let activeDays = [];
+            for(let i=0; i<7; i++) {
+                if((sched.days & dayVals[i]) !== 0) activeDays.push(dayNames[i]);
+            }
+            let daysText = activeDays.length === 7 ? "Everyday" : activeDays.join(", ");
             
             listDiv.innerHTML += `
                 <div class="schedule-card">
                     <div class="schedule-info">
                         <h4><i class="fa-regular fa-clock"></i> ${hh}:${mm}</h4>
-                        <p>Status: ${sched.active ? '<span style="color:green;font-weight:bold;">Active</span>' : 'Paused'}</p>
+                        <p style="margin-bottom: 4px;"><strong>Days:</strong> ${daysText}</p>
+                        <p><strong>Status:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:bold;">Active</span>' : '<span style="color:var(--danger);font-weight:bold;">Paused</span>'}</p>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive(${index}, this.checked)">
+                        <input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive('${index}', this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
             `;
         });
+
+        if (!hasSchedules) {
+            listDiv.innerHTML = `<p style="text-align:center; color:#888; margin-top:20px;">No active schedules. Click below to create one!</p>`;
+        }
     });
 
     // --- 7. FIREBASE WRITE ---
@@ -472,7 +490,7 @@
 
             for(let f=0; f<fertCounts[z]; f++) {
                 let compEl = document.getElementById(`sel-comp-${z}-${f}`);
-                if(!compEl) continue; // Row was deleted
+                if(!compEl) continue; 
                 
                 let fDaysMask = 0;
                 document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));
@@ -486,7 +504,6 @@
             sData.zones.push(zoneObj);
         }
 
-        // Save as schedule 0 (Overwrites existing for now to match ESP32 memory constraints)
         db.ref('schedules/0').set(sData).then(() => {
             alert("✅ Master Schedule Saved!");
             logActivity("📝 New Schedule Created");

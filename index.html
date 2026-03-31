@@ -2,288 +2,498 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Irrigation Pro - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Irrigation Pro</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: auto; }
-        h1, h2, h3 { color: #2c3e50; text-align: center; }
+        :root {
+            --bg-color: #f2f2f7;
+            --card-bg: #ffffff;
+            --primary: #007AFF; 
+            --fert-color: #34C759; 
+            --danger: #FF3B30;
+            --text-main: #1C1C1E;
+            --text-muted: #8E8E93;
+            --border-radius: 20px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0; padding: 0; padding-bottom: 120px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 20px; text-align: center;
+            position: sticky; top: 0; z-index: 100;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+        .connection-status { font-size: 13px; font-weight: 600; margin-top: 4px; color: var(--text-muted); }
+
+        .container { max-width: 800px; margin: 20px auto; padding: 0 15px; }
+
+        /* --- LIVE STATUS BANNER & NOTIFICATIONS --- */
+        .status-banner {
+            background: linear-gradient(135deg, #007AFF, #00C6FF);
+            color: white; padding: 20px; border-radius: var(--border-radius);
+            margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0, 122, 255, 0.2);
+        }
+        .status-banner h2 { margin: 0 0 12px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+        .live-feed { font-size: 15px; font-weight: 600; line-height: 1.8; }
+        .feed-item { display: inline-block; background: rgba(255,255,255,0.25); padding: 5px 12px; border-radius: 20px; margin: 0 5px 5px 0; backdrop-filter: blur(5px); }
+
+        .notifications-card {
+            background: var(--card-bg); border-radius: var(--border-radius);
+            padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+        .notifications-card h3 { margin: 0 0 15px 0; font-size: 16px; color: var(--text-muted); }
+        .log-list { list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto; }
+        .log-list li { font-size: 14px; padding: 8px 0; border-bottom: 1px solid #eee; color: #444; display: flex; align-items: center; }
+        .log-list li:last-child { border-bottom: none; }
+        .log-time { color: var(--text-muted); font-size: 12px; margin-right: 10px; width: 60px; }
+
+        /* --- CONTROL GRIDS --- */
+        .section-title { font-size: 18px; font-weight: 700; margin-bottom: 15px; color: var(--text-main); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; margin-bottom: 30px; }
+
+        .control-card {
+            background: var(--card-bg); padding: 15px; border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column;
+            align-items: center; transition: 0.2s; border: 1px solid transparent;
+        }
+        .control-card.active-card { border-color: var(--primary); background: #f0f8ff; }
+        .control-card.active-fert { border-color: var(--fert-color); background: #f0fff4; }
+        .card-icon { font-size: 22px; margin-bottom: 10px; color: var(--text-muted); transition: 0.3s; }
+        .active-card .card-icon { color: var(--primary); }
+        .active-fert .card-icon { color: var(--fert-color); }
+        .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; text-align: center; }
+
+        /* --- iOS TOGGLE SWITCH --- */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #E5E5EA; transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider.fert-slider { background-color: var(--fert-color); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* --- BOTTOM ACTION BAR --- */
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px); padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom));
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.05); display: flex; justify-content: center; z-index: 100;
+        }
+        .btn-schedule {
+            background: var(--text-main); color: white; border: none; padding: 16px 20px;
+            border-radius: 30px; font-size: 16px; font-weight: 600; cursor: pointer;
+            width: 100%; max-width: 300px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-danger { background: var(--danger); width: 60px; margin-left: 10px; padding: 0; flex-shrink: 0; }
+
+        /* --- MODALS (Hub & Creator) --- */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 999; overflow-y: auto; animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .modal-header {
+            background: var(--card-bg); padding: 20px; display: flex; justify-content: space-between;
+            align-items: center; position: sticky; top: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10;
+        }
+        .modal-header h2 { margin: 0; font-size: 20px; }
+        .close-btn { background: #E5E5EA; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; color: var(--text-main); }
+
+        /* Schedule Hub specific */
+        .schedule-card {
+            background: white; padding: 20px; border-radius: 16px; margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary);
+        }
+        .schedule-info h4 { margin: 0 0 5px 0; font-size: 18px; }
+        .schedule-info p { margin: 0; font-size: 13px; color: var(--text-muted); }
         
-        /* Status Indicators */
-        .status-row { display: flex; justify-content: space-around; font-weight: bold; margin-bottom: 10px; }
-        .status-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; background: #ccc; }
-        .dot-on { background: #27ae60; box-shadow: 0 0 8px #27ae60; }
+        .btn-create {
+            background: var(--primary); color: white; border: none; padding: 16px; width: 100%;
+            border-radius: 16px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px;
+        }
+
+        /* Form styling */
+        .setup-card { background: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        .setup-card h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;}
+        input[type="time"] { font-family: 'Inter'; font-size: 22px; font-weight: bold; padding: 10px; border: 1px solid #ddd; border-radius: 10px; width: 100%; box-sizing: border-box;}
         
-        /* Buttons */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
-        button { padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; }
-        .btn-irr { background: #3498db; color: white; }
-        .btn-fert { background: #9b59b6; color: white; }
-        .btn-off { background: #bdc3c7; color: #333; }
-        .btn-active { box-shadow: inset 0 0 0 3px #2c3e50; filter: brightness(1.1); }
-        .btn-danger { background: #e74c3c; color: white; width: 100%; padding: 15px; font-size: 18px; margin-top: 10px; }
+        /* Day Selector Pills */
+        .day-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .day-pill {
+            display: inline-block; padding: 8px 12px; background: #f0f0f0; border-radius: 8px;
+            cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; border: 1px solid transparent;
+        }
+        .day-checkbox { display: none; }
+        .day-checkbox:checked + .day-pill { background: #e6f2ff; color: var(--primary); border-color: var(--primary); }
+        .day-checkbox.fert-cb:checked + .day-pill { background: #eafaf1; color: var(--fert-color); border-color: var(--fert-color); }
+
+        .zone-setup { background: #fafafa; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+        .zone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-weight: bold; font-size: 16px;}
         
-        /* Schedule Table */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
-        th { background: #ecf0f1; }
-        input[type="number"] { width: 60px; padding: 5px; text-align: center; }
-        select { padding: 5px; }
+        .input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #eee;}
+        .input-group input { width: 60px; text-align: center; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px;}
         
-        /* Time & Days */
-        .schedule-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
-        .days-group label { margin-right: 8px; font-size: 14px; }
-        .save-btn { background: #2ecc71; color: white; font-size: 16px; padding: 10px 20px; }
+        .fert-container { margin-top: 10px; }
+        .fert-row { background: white; border: 1px dashed #ccc; padding: 15px; border-radius: 10px; margin-bottom: 10px; position: relative;}
+        .remove-fert { position: absolute; top: 10px; right: 10px; color: var(--danger); cursor: pointer; background: none; border: none; font-size: 16px;}
+        .fert-row select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; margin-right: 10px; font-size: 14px;}
         
-        .heartbeat { text-align: center; font-size: 12px; color: #7f8c8d; }
+        .btn-add-fert { background: #f0f0f0; color: var(--text-main); border: none; padding: 10px; width: 100%; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px;}
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🌱 Smart Irrigation Pro</h1>
-    <div class="heartbeat" id="heartbeat-display">ESP32 Status: Checking...</div>
-
-    <div class="card">
-        <h2>Live System Status</h2>
-        <div class="status-row">
-            <div><span class="status-dot" id="dot-main-pump"></span> Main Pump</div>
-            <div><span class="status-dot" id="dot-fert-pump"></span> Fert Pump</div>
-        </div>
+    <div class="header">
+        <h1>Smart Irrigation Pro</h1>
+        <div class="connection-status" id="heartbeat-display">Connecting to System...</div>
     </div>
 
-    <div class="card">
-        <h2>Manual Control</h2>
-        
-        <h3>Irrigation Zones</h3>
-        <div class="grid">
-            <button class="btn-irr" id="btn-irr-1" onclick="setManualIrr(1)">Zone 1</button>
-            <button class="btn-irr" id="btn-irr-2" onclick="setManualIrr(2)">Zone 2</button>
-            <button class="btn-irr" id="btn-irr-3" onclick="setManualIrr(3)">Zone 3</button>
-            <button class="btn-irr" id="btn-irr-4" onclick="setManualIrr(4)">Zone 4</button>
-            <button class="btn-irr" id="btn-irr-5" onclick="setManualIrr(5)">Zone 5</button>
-            <button class="btn-irr" id="btn-irr-6" onclick="setManualIrr(6)">Zone 6</button>
-            <button class="btn-off" onclick="setManualIrr(0)">Turn All OFF</button>
-        </div>
-
-        <h3>Fertilizer Compartments</h3>
-        <div class="grid">
-            <button class="btn-fert" id="btn-fert-1" onclick="setManualFert(1)">Comp 1</button>
-            <button class="btn-fert" id="btn-fert-2" onclick="setManualFert(2)">Comp 2</button>
-            <button class="btn-fert" id="btn-fert-3" onclick="setManualFert(3)">Comp 3</button>
-            <button class="btn-fert" id="btn-fert-4" onclick="setManualFert(4)">Comp 4</button>
-            <button class="btn-off" onclick="setManualFert(0)">Turn All OFF</button>
-        </div>
-
-        <button class="btn-danger" onclick="triggerEmergencyStop()">🚨 EMERGENCY STOP 🚨</button>
-    </div>
-
-    <div class="card">
-        <h2>Master Schedule Configuration</h2>
-        
-        <div class="schedule-header">
-            <div>
-                <label><b>Enable Schedule:</b> <input type="checkbox" id="sched-active"></label>
-            </div>
-            <div>
-                <b>Start Time: </b> 
-                <input type="number" id="sched-hour" min="0" max="23" placeholder="HH"> : 
-                <input type="number" id="sched-minute" min="0" max="59" placeholder="MM">
+    <div class="container">
+        <div class="status-banner">
+            <h2><i class="fa-solid fa-satellite-dish"></i> Live Feed</h2>
+            <div class="live-feed" id="live-feed">
+                <span class="feed-item"><i class="fa-solid fa-spinner fa-spin"></i> Syncing...</span>
             </div>
         </div>
 
-        <div class="days-group">
-            <b>Days:</b>
-            <label><input type="checkbox" class="day-cb" value="1"> Sun</label>
-            <label><input type="checkbox" class="day-cb" value="2"> Mon</label>
-            <label><input type="checkbox" class="day-cb" value="4"> Tue</label>
-            <label><input type="checkbox" class="day-cb" value="8"> Wed</label>
-            <label><input type="checkbox" class="day-cb" value="16"> Thu</label>
-            <label><input type="checkbox" class="day-cb" value="32"> Fri</label>
-            <label><input type="checkbox" class="day-cb" value="64"> Sat</label>
+        <div class="notifications-card">
+            <h3><i class="fa-regular fa-bell"></i> Recent Activity</h3>
+            <ul class="log-list" id="activity-log">
+                <li><span class="log-time">Just now</span> System Dashboard Loaded</li>
+            </ul>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Zone</th>
-                    <th>Water (Mins)</th>
-                    <th>Fertilizer (Mins)</th>
-                    <th>Fertilizer Source</th>
-                </tr>
-            </thead>
-            <tbody id="schedule-body">
-                </tbody>
-        </table>
+        <div class="section-title">Water Zones</div>
+        <div class="grid" id="irr-grid"></div>
 
-        <div style="text-align: right; margin-top: 15px;">
-            <button class="save-btn" onclick="saveSchedule()">💾 Save Master Schedule</button>
+        <div class="section-title">Fertilizer Injectors</div>
+        <div class="grid" id="fert-grid"></div>
+    </div>
+
+    <div class="bottom-bar">
+        <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-regular fa-calendar-alt"></i> Schedule Manager</button>
+        <button class="btn-schedule btn-danger" onclick="emergencyStop()" title="Emergency Stop">
+            <i class="fa-solid fa-power-off"></i>
+        </button>
+    </div>
+
+    <div class="modal" id="scheduleHubModal">
+        <div class="modal-header">
+            <h2>Scheduled Irrigation</h2>
+            <button class="close-btn" onclick="closeScheduleHub()">Done</button>
+        </div>
+        <div class="container">
+            <div id="active-schedules-list">
+                </div>
+            <button class="btn-create" onclick="openScheduleCreator()"><i class="fa-solid fa-plus"></i> Create New Schedule</button>
         </div>
     </div>
-</div>
+
+    <div class="modal" id="scheduleCreatorModal">
+        <div class="modal-header">
+            <h2>Create Schedule</h2>
+            <button class="close-btn" onclick="closeScheduleCreator()">Cancel</button>
+        </div>
+        <div class="container" style="padding-top: 20px;">
+            
+            <div class="setup-card">
+                <h3>Start Time</h3>
+                <input type="time" id="sched-time" required>
+            </div>
+
+            <div class="setup-card">
+                <h3>Watering Days (Applies to Zones)</h3>
+                <div class="day-selector" id="master-days"></div>
+            </div>
+
+            <div class="setup-card">
+                <h3>Zone & Fertilizer Configuration</h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Set water duration. Add up to 4 fertilizer injections per zone with independent days.</p>
+                <div id="zone-config-container"></div>
+            </div>
+
+            <button class="btn-create" onclick="saveNewSchedule()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Schedule</button>
+        </div>
+    </div>
 
 <script>
-    // 1. Firebase Configuration (Already securely matched to your ESP32)
+    // --- 1. FIREBASE SETUP ---
     const firebaseConfig = {
         apiKey: "AIzaSyAbfqRl4T3cv6cjZz9wT9J9cOjOenp-UJY",
         databaseURL: "https://smart-irrigation-c039f-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
-
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Generate Schedule Table Rows
-    const tbody = document.getElementById('schedule-body');
-    for(let i=0; i<6; i++) {
-        tbody.innerHTML += `
-            <tr>
-                <td><b>Zone ${i+1}</b></td>
-                <td><input type="number" id="irrDur-${i}" min="0" value="0"></td>
-                <td><input type="number" id="fertDur-${i}" min="0" value="0"></td>
-                <td>
-                    <select id="fertZone-${i}">
-                        <option value="0">None</option>
-                        <option value="1">Comp 1</option>
-                        <option value="2">Comp 2</option>
-                        <option value="3">Comp 3</option>
-                        <option value="4">Comp 4</option>
-                    </select>
-                </td>
-            </tr>
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayVals = [1, 2, 4, 8, 16, 32, 64];
+
+    // --- 2. BUILD HOME UI ---
+    for(let i=1; i<=6; i++) {
+        document.getElementById('irr-grid').innerHTML += `
+            <div class="control-card" id="card-irr-${i}">
+                <i class="fa-solid fa-droplet card-icon"></i>
+                <div class="card-title">Zone ${i}</div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-irr-${i}" onchange="handleManualIrr(${i}, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
         `;
     }
 
-    // --- WRITE FUNCTIONS ---
-
-    function setManualIrr(zoneNum) {
-        db.ref('system/manualIrrZone').set(zoneNum);
+    for(let i=1; i<=4; i++) {
+        document.getElementById('fert-grid').innerHTML += `
+            <div class="control-card" id="card-fert-${i}">
+                <i class="fa-solid fa-flask card-icon fert-icon"></i>
+                <div class="card-title">Comp ${i}</div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-fert-${i}" onchange="handleManualFert(${i}, this.checked)">
+                    <span class="slider fert-slider"></span>
+                </label>
+            </div>
+        `;
     }
 
-    function setManualFert(zoneNum) {
-        db.ref('system/manualFertZone').set(zoneNum);
+    // --- 3. BUILD CREATOR UI ---
+    let mDaysHTML = '';
+    for(let i=0; i<7; i++) {
+        mDaysHTML += `<label><input type="checkbox" class="day-checkbox m-day" value="${dayVals[i]}"><span class="day-pill">${dayNames[i]}</span></label>`;
+    }
+    document.getElementById('master-days').innerHTML = mDaysHTML;
+
+    let zConfigHTML = '';
+    for(let z=0; z<6; z++) {
+        zConfigHTML += `
+            <div class="zone-setup">
+                <div class="zone-header">
+                    <span><i class="fa-solid fa-droplet" style="color:var(--primary)"></i> Zone ${z+1}</span>
+                </div>
+                <div class="input-group">
+                    <span style="font-weight:600; font-size:14px;">Water Duration</span>
+                    <div><input type="number" id="z-irrDur-${z}" min="0" value="0"> <span style="font-size:12px; color:#888;">mins</span></div>
+                </div>
+                
+                <div class="fert-container" id="fert-container-${z}">
+                    </div>
+                <button class="btn-add-fert" onclick="addFertRow(${z})"><i class="fa-solid fa-plus"></i> Add Fertilizer</button>
+            </div>
+        `;
+    }
+    document.getElementById('zone-config-container').innerHTML = zConfigHTML;
+
+    // Logic to dynamically add up to 4 fertilizer rows per zone
+    let fertCounts = [0,0,0,0,0,0];
+    function addFertRow(zoneIdx) {
+        if(fertCounts[zoneIdx] >= 4) { alert("Maximum 4 fertilizers allowed per zone."); return; }
+        
+        let rowId = fertCounts[zoneIdx];
+        let fDaysHTML = '';
+        for(let d=0; d<7; d++) {
+            fDaysHTML += `<label><input type="checkbox" class="day-checkbox fert-cb f-day-${zoneIdx}-${rowId}" value="${dayVals[d]}"><span class="day-pill">${dayNames[d]}</span></label>`;
+        }
+
+        let html = `
+            <div class="fert-row" id="frow-${zoneIdx}-${rowId}">
+                <button class="remove-fert" onclick="removeFertRow(${zoneIdx}, ${rowId})"><i class="fa-solid fa-circle-xmark"></i></button>
+                <div style="margin-bottom: 10px; display:flex; align-items:center;">
+                    <select id="sel-comp-${zoneIdx}-${rowId}">
+                        <option value="1">Comp 1</option><option value="2">Comp 2</option>
+                        <option value="3">Comp 3</option><option value="4">Comp 4</option>
+                    </select>
+                    <input type="number" id="sel-mins-${zoneIdx}-${rowId}" min="1" value="5" style="width:50px; padding:6px; border-radius:6px; border:1px solid #ccc; text-align:center;">
+                    <span style="font-size:12px; margin-left:5px;">mins</span>
+                </div>
+                <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">Fertilize On:</div>
+                <div class="day-selector">${fDaysHTML}</div>
+            </div>
+        `;
+        document.getElementById(`fert-container-${zoneIdx}`).insertAdjacentHTML('beforeend', html);
+        fertCounts[zoneIdx]++;
     }
 
-    function triggerEmergencyStop() {
-        if(confirm("Are you sure you want to stop all pumps and clear manual overrides?")) {
+    function removeFertRow(zoneIdx, rowId) {
+        let el = document.getElementById(`frow-${zoneIdx}-${rowId}`);
+        if(el) el.remove();
+        // We don't decrement count to avoid ID collisions on save, we just ignore missing elements.
+    }
+
+    // --- 4. MODAL NAVIGATION ---
+    function openScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'block'; }
+    function closeScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'none'; }
+    
+    function openScheduleCreator() { 
+        // Reset form
+        document.getElementById('sched-time').value = "";
+        document.querySelectorAll('.m-day').forEach(cb => cb.checked = false);
+        for(let z=0; z<6; z++) {
+            document.getElementById(`z-irrDur-${z}`).value = 0;
+            document.getElementById(`fert-container-${z}`).innerHTML = "";
+            fertCounts[z] = 0;
+        }
+        document.getElementById('scheduleCreatorModal').style.display = 'block'; 
+    }
+    function closeScheduleCreator() { document.getElementById('scheduleCreatorModal').style.display = 'none'; }
+
+    // --- 5. ACTIVITY LOGGING ---
+    function logActivity(message) {
+        let now = new Date();
+        let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        let logList = document.getElementById('activity-log');
+        let newLi = document.createElement('li');
+        newLi.innerHTML = `<span class="log-time">${timeStr}</span> ${message}`;
+        logList.insertBefore(newLi, logList.firstChild);
+        if(logList.children.length > 6) logList.removeChild(logList.lastChild);
+    }
+
+    // --- 6. FIREBASE SYNC (LIVE DATA) ---
+    let lastState = {};
+    db.ref('system').on('value', (snap) => {
+        const sys = snap.val() || {};
+        
+        // Update UI & Log Changes
+        for(let i=1; i<=6; i++) { 
+            let isON = (sys.manualIrrZone === i);
+            document.getElementById(`toggle-irr-${i}`).checked = isON; 
+            document.getElementById(`card-irr-${i}`).className = isON ? "control-card active-card" : "control-card";
+        }
+        if(sys.manualIrrZone !== lastState.irr && sys.manualIrrZone > 0) logActivity(`💦 Manual Water: Zone ${sys.manualIrrZone} Started`);
+
+        for(let i=1; i<=4; i++) { 
+            let isON = (sys.manualFertZone === i);
+            document.getElementById(`toggle-fert-${i}`).checked = isON; 
+            document.getElementById(`card-fert-${i}`).className = isON ? "control-card active-fert" : "control-card";
+        }
+        if(sys.manualFertZone !== lastState.fert && sys.manualFertZone > 0) logActivity(`🧪 Manual Fert: Comp ${sys.manualFertZone} Started`);
+
+        lastState.irr = sys.manualIrrZone;
+        lastState.fert = sys.manualFertZone;
+
+        // Live Feed Banner
+        let feed = [];
+        feed.push(`<span class="feed-item">🟢 Main Valve ON</span>`);
+        if (sys.pump1Active) feed.push(`<span class="feed-item" style="background:var(--primary);">💦 Main Pump Running</span>`);
+        if (sys.fertPumpActive) feed.push(`<span class="feed-item" style="background:var(--fert-color);">🧪 Fert Pump Running</span>`);
+        if (sys.activeIrrZone > 0) feed.push(`<span class="feed-item">📍 Zone ${sys.activeIrrZone} Open</span>`);
+        if (sys.activeFertZone > 0) feed.push(`<span class="feed-item">🧪 Comp ${sys.activeFertZone} Open</span>`);
+        
+        if(feed.length === 1) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`);
+        document.getElementById('live-feed').innerHTML = feed.join('');
+
+        // Heartbeat
+        let diff = Math.floor(Date.now()/1000) - (sys.heartbeat || 0);
+        let hb = document.getElementById('heartbeat-display');
+        if(diff < 15) { hb.innerHTML = "🟢 System Online"; hb.style.color = "var(--fert-color)"; } 
+        else { hb.innerHTML = "🔴 System Offline"; hb.style.color = "var(--danger)"; }
+    });
+
+    // Load Schedules into the Hub
+    db.ref('schedules').on('value', (snap) => {
+        const listDiv = document.getElementById('active-schedules-list');
+        listDiv.innerHTML = "";
+        const schedules = snap.val() || [];
+        
+        if(schedules.length === 0 || !schedules[0]) {
+            listDiv.innerHTML = `<p style="text-align:center; color:#888; margin-bottom:20px;">No active schedules.</p>`;
+            return;
+        }
+
+        schedules.forEach((sched, index) => {
+            if(!sched) return;
+            let hh = String(sched.hour).padStart(2, '0');
+            let mm = String(sched.minute).padStart(2, '0');
+            
+            listDiv.innerHTML += `
+                <div class="schedule-card">
+                    <div class="schedule-info">
+                        <h4><i class="fa-regular fa-clock"></i> ${hh}:${mm}</h4>
+                        <p>Status: ${sched.active ? '<span style="color:green;font-weight:bold;">Active</span>' : 'Paused'}</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive(${index}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            `;
+        });
+    });
+
+    // --- 7. FIREBASE WRITE ---
+    function handleManualIrr(zoneNum, isChecked) { db.ref('system/manualIrrZone').set(isChecked ? zoneNum : 0); }
+    function handleManualFert(compNum, isChecked) { db.ref('system/manualFertZone').set(isChecked ? compNum : 0); }
+
+    function emergencyStop() {
+        if(confirm("🚨 STOP ALL PUMPS AND VALVES?")) {
             db.ref('system/emergencyStop').set(true);
+            logActivity("🛑 EMERGENCY STOP TRIGGERED");
         }
     }
 
-    function saveSchedule() {
-        let daysMask = 0;
-        document.querySelectorAll('.day-cb').forEach(cb => {
-            if(cb.checked) daysMask += parseInt(cb.value);
-        });
+    function toggleScheduleActive(index, isActive) {
+        db.ref(`schedules/${index}/active`).set(isActive);
+        logActivity(isActive ? "🗓️ Schedule Activated" : "🗓️ Schedule Paused");
+    }
 
-        let scheduleData = {
-            active: document.getElementById('sched-active').checked,
-            hour: parseInt(document.getElementById('sched-hour').value) || 0,
-            minute: parseInt(document.getElementById('sched-minute').value) || 0,
-            days: daysMask,
-            irrDur: [],
-            fertDur: [],
-            fertZone: []
+    function saveNewSchedule() {
+        let timeVal = document.getElementById('sched-time').value;
+        if(!timeVal) { alert("Please set a start time."); return; }
+        let parts = timeVal.split(':');
+        
+        let mDaysMask = 0;
+        document.querySelectorAll('.m-day:checked').forEach(cb => mDaysMask += parseInt(cb.value));
+        if(mDaysMask === 0) { alert("Please select at least one watering day."); return; }
+
+        let sData = {
+            active: true, hour: parseInt(parts[0]), minute: parseInt(parts[1]), days: mDaysMask, zones: []
         };
 
-        for(let i=0; i<6; i++) {
-            scheduleData.irrDur.push(parseInt(document.getElementById(`irrDur-${i}`).value) || 0);
-            scheduleData.fertDur.push(parseInt(document.getElementById(`fertDur-${i}`).value) || 0);
-            scheduleData.fertZone.push(parseInt(document.getElementById(`fertZone-${i}`).value) || 0);
+        for(let z=0; z<6; z++) {
+            let zoneObj = {
+                waterMins: parseInt(document.getElementById(`z-irrDur-${z}`).value) || 0,
+                ferts: []
+            };
+
+            for(let f=0; f<fertCounts[z]; f++) {
+                let compEl = document.getElementById(`sel-comp-${z}-${f}`);
+                if(!compEl) continue; // Row was deleted
+                
+                let fDaysMask = 0;
+                document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));
+                
+                zoneObj.ferts.push({
+                    comp: parseInt(compEl.value),
+                    mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0,
+                    days: fDaysMask
+                });
+            }
+            sData.zones.push(zoneObj);
         }
 
-        db.ref('schedule').set(scheduleData).then(() => {
-            alert("Master Schedule Saved Successfully!");
-        }).catch((error) => {
-            alert("Error saving: " + error);
-        });
+        // Save as schedule 0 (Overwrites existing for now to match ESP32 memory constraints)
+        db.ref('schedules/0').set(sData).then(() => {
+            alert("✅ Master Schedule Saved!");
+            logActivity("📝 New Schedule Created");
+            closeScheduleCreator();
+            openScheduleHub();
+        }).catch(err => alert("Error: " + err));
     }
-
-    // --- READ FUNCTIONS (Live Updates) ---
-
-    // Listen to System Status
-    db.ref('system').on('value', (snapshot) => {
-        const data = snapshot.val() || {};
-        
-        // Manual Irrigation Buttons
-        for(let i=1; i<=6; i++) {
-            let btn = document.getElementById(`btn-irr-${i}`);
-            if (data.manualIrrZone === i) {
-                btn.style.filter = "brightness(0.7)";
-                btn.innerText = `Zone ${i} (ON)`;
-            } else {
-                btn.style.filter = "brightness(1)";
-                btn.innerText = `Zone ${i}`;
-            }
-        }
-
-        // Manual Fert Buttons
-        for(let i=1; i<=4; i++) {
-            let btn = document.getElementById(`btn-fert-${i}`);
-            if (data.manualFertZone === i) {
-                btn.style.filter = "brightness(0.7)";
-                btn.innerText = `Comp ${i} (ON)`;
-            } else {
-                btn.style.filter = "brightness(1)";
-                btn.innerText = `Comp ${i}`;
-            }
-        }
-
-        // Pump Dots
-        document.getElementById('dot-main-pump').className = data.pump1Active ? "status-dot dot-on" : "status-dot";
-        document.getElementById('dot-fert-pump').className = data.fertPumpActive ? "status-dot dot-on" : "status-dot";
-
-        // Heartbeat logic
-        let now = Math.floor(Date.now() / 1000);
-        let diff = now - (data.heartbeat || 0);
-        if (diff < 15) {
-            document.getElementById('heartbeat-display').innerHTML = "🟢 ESP32 is Online & Connected";
-            document.getElementById('heartbeat-display').style.color = "#27ae60";
-        } else {
-            document.getElementById('heartbeat-display').innerHTML = "🔴 ESP32 is Offline (Last seen " + diff + " seconds ago)";
-            document.getElementById('heartbeat-display').style.color = "#e74c3c";
-        }
-    });
-
-    // Load Schedule Data into UI exactly once on page load
-    db.ref('schedule').once('value', (snapshot) => {
-        const sched = snapshot.val();
-        if(!sched) return;
-
-        document.getElementById('sched-active').checked = sched.active || false;
-        document.getElementById('sched-hour').value = sched.hour || 0;
-        document.getElementById('sched-minute').value = sched.minute || 0;
-
-        document.querySelectorAll('.day-cb').forEach(cb => {
-            let val = parseInt(cb.value);
-            cb.checked = (sched.days & val) === val;
-        });
-
-        for(let i=0; i<6; i++) {
-            if(sched.irrDur) document.getElementById(`irrDur-${i}`).value = sched.irrDur[i] || 0;
-            if(sched.fertDur) document.getElementById(`fertDur-${i}`).value = sched.fertDur[i] || 0;
-            if(sched.fertZone) document.getElementById(`fertZone-${i}`).value = sched.fertZone[i] || 0;
-        }
-    });
-
-    // Check heartbeat continuously
-    setInterval(() => {
-        db.ref('system/heartbeat').once('value').then((snapshot) => {
-             let now = Math.floor(Date.now() / 1000);
-             let diff = now - (snapshot.val() || 0);
-             if(diff >= 15) {
-                 document.getElementById('heartbeat-display').innerHTML = "🔴 ESP32 is Offline (No heartbeat)";
-                 document.getElementById('heartbeat-display').style.color = "#e74c3c";
-             }
-        });
-    }, 5000);
-
 </script>
 </body>
 </html>

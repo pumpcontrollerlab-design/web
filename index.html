@@ -182,6 +182,7 @@ const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const dayVals = [1, 2, 4, 8, 16, 32, 64];
 
 let localSchedules = {};
+let currentSysState = {}; // Added state tracker
 
 // --- BUILD UI ---
 for(let i=1; i<=6; i++) {
@@ -274,6 +275,7 @@ if(logList.children.length > 6) logList.removeChild(logList.lastChild);
 let lastState = {};
 db.ref('system').on('value', (snap) => {
 const sys = snap.val() || {};
+currentSysState = sys; // Keep live track of the system for Emergency Stop
 
 for(let i=1; i<=6; i++) {
 let isON = (sys.manualIrrZone === i);
@@ -299,13 +301,12 @@ else { hb.innerHTML = "🔴 System Offline"; hb.style.color = "var(--danger)"; }
 
 let feed = [];
 if (isOnline) {
-  // --- EDITED SECTION: Main Valve only shows ON if a zone is active ---
   if (sys.activeIrrZone > 0) feed.push(`<span class="feed-item">🟢 Main Valve ON</span>`);
   if (sys.pump1Active) feed.push(`<span class="feed-item" style="background:var(--primary);">💦 Main Pump Running</span>`);
   if (sys.fertPumpActive) feed.push(`<span class="feed-item" style="background:var(--fert-color);">🧪 Fert Pump Running</span>`);
   if (sys.activeIrrZone > 0) feed.push(`<span class="feed-item">📍 Zone ${sys.activeIrrZone} Open</span>`);
   if (sys.activeFertZone > 0) feed.push(`<span class="feed-item">🧪 Comp ${sys.activeFertZone} Open</span>`);
-  if(feed.length === 0) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`); // Changed to length === 0
+  if(feed.length === 0) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`);
 } else {
   feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - No Data Available</span>`);
 }
@@ -357,10 +358,20 @@ function handleManualIrr(zoneNum, isChecked) { db.ref('system/manualIrrZone').se
 function handleManualFert(compNum, isChecked) { db.ref('system/manualFertZone').set(isChecked ? compNum : 0); }
 
 function emergencyStop() {
-if(confirm("🚨 STOP ALL PUMPS AND VALVES?")) {
-db.ref('system/emergencyStop').set(true);
-logActivity("🛑 EMERGENCY STOP TRIGGERED");
-}
+  let isRunning = (currentSysState.activeIrrZone > 0) || 
+                  (currentSysState.manualIrrZone > 0) || 
+                  (currentSysState.pump1Active) || 
+                  (currentSysState.fertPumpActive);
+
+  if (!isRunning) {
+    alert("System is already in Standby. No active tasks to stop.");
+    return;
+  }
+
+  if(confirm("🚨 STOP ALL PUMPS AND VALVES?")) {
+    db.ref('system/emergencyStop').set(true);
+    logActivity("🛑 EMERGENCY STOP TRIGGERED");
+  }
 }
 
 function toggleScheduleActive(key, isActive) {

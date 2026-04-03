@@ -68,6 +68,8 @@ input:checked + .slider:before { transform: translateX(20px); }
 .action-btns { margin-top: 15px; display: flex; gap: 10px; border-top: 1px solid #eee; padding-top: 15px; }
 .action-btns button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-size: 14px; }
 .btn-delete { background: #ffebee; color: var(--danger); }
+/* --- NEW CSS FOR EDIT BUTTON --- */
+.btn-edit { background: #e6f2ff; color: var(--primary); }
 .btn-create { background: var(--primary); color: white; border: none; padding: 16px; width: 100%; border-radius: 16px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; margin-bottom: 40px; }
 
 .setup-card { background: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
@@ -164,7 +166,7 @@ input[type="time"] { font-family: 'Inter'; font-size: 22px; font-weight: bold; p
 
 <div class="modal" id="scheduleCreatorModal">
 <div class="modal-header">
-<h2>Create Schedule</h2>
+<h2 id="scheduleModalTitle">Create Schedule</h2>
 <button class="close-btn" onclick="closeScheduleCreator()">Cancel</button>
 </div>
 <div class="container" style="padding-top: 20px;">
@@ -181,7 +183,7 @@ input[type="time"] { font-family: 'Inter'; font-size: 22px; font-weight: bold; p
 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Set water duration. Add up to 4 fertilizer injections per zone.</p>
 <div id="zone-config-container"></div>
 </div>
-<button class="btn-create" onclick="saveNewSchedule()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Schedule</button>
+<button class="btn-create" id="btn-save-schedule" onclick="saveSchedule()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Schedule</button>
 </div>
 </div>
 
@@ -239,6 +241,9 @@ let currentSysState = {};
 
 let pendingManualType = ""; 
 let pendingManualId = 0;
+
+// NEW: Global variable to track if we are editing an existing schedule
+let editingSlotKey = null; 
 
 // BUILD UI
 for(let i=1; i<=6; i++) {
@@ -306,9 +311,74 @@ fertCounts[zoneIdx]++;
 }
 function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-${zoneIdx}-${rowId}`); if(el) el.remove(); }
 
+// --- SCHEDULE CREATOR/EDITOR FUNCTIONS ---
+function resetScheduleForm() {
+    document.getElementById('sched-time').value = "";
+    document.querySelectorAll('.m-day').forEach(cb => cb.checked = false);
+    for(let z=0; z<6; z++) {
+        document.getElementById(`z-irrDur-${z}`).value = 0;
+        document.getElementById(`fert-container-${z}`).innerHTML = "";
+        fertCounts[z] = 0;
+    }
+}
+
 function openScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'block'; }
 function closeScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'none'; }
-function openScheduleCreator() { document.getElementById('scheduleCreatorModal').style.display = 'block'; }
+
+function openScheduleCreator() { 
+    editingSlotKey = null; // Clear edit mode
+    document.getElementById('scheduleModalTitle').innerText = "Create Schedule";
+    document.getElementById('btn-save-schedule').innerHTML = '<i class="fa-solid fa-check"></i> Save Schedule';
+    resetScheduleForm();
+    document.getElementById('scheduleCreatorModal').style.display = 'block'; 
+}
+
+function openScheduleEditor(key) {
+    let sched = localSchedules[key];
+    if (!sched) return;
+    
+    editingSlotKey = key; // Enter edit mode
+    document.getElementById('scheduleModalTitle').innerText = "Edit Schedule";
+    document.getElementById('btn-save-schedule').innerHTML = '<i class="fa-solid fa-check"></i> Update Schedule';
+    
+    resetScheduleForm(); // Clean form first
+
+    // 1. Populate Time
+    let hh = String(sched.hour).padStart(2, '0');
+    let mm = String(sched.minute).padStart(2, '0');
+    document.getElementById('sched-time').value = `${hh}:${mm}`;
+
+    // 2. Populate Master Days
+    document.querySelectorAll('.m-day').forEach(cb => {
+        let val = parseInt(cb.value);
+        cb.checked = ((sched.days & val) !== 0);
+    });
+
+    // 3. Populate Zones and Fertilizers
+    for(let z=0; z<6; z++) {
+        if(sched.zones && sched.zones[z]) {
+            document.getElementById(`z-irrDur-${z}`).value = sched.zones[z].waterMins || 0;
+            
+            if(sched.zones[z].ferts) {
+                sched.zones[z].ferts.forEach((fert, idx) => {
+                    addFertRow(z); // Programmatically generate the row
+                    let rowId = fertCounts[z] - 1; // It was just incremented
+                    
+                    document.getElementById(`sel-comp-${z}-${rowId}`).value = fert.comp;
+                    document.getElementById(`sel-mins-${z}-${rowId}`).value = fert.mins;
+                    
+                    document.querySelectorAll(`.f-day-${z}-${rowId}`).forEach(cb => {
+                        let val = parseInt(cb.value);
+                        cb.checked = ((fert.days & val) !== 0);
+                    });
+                });
+            }
+        }
+    }
+    
+    document.getElementById('scheduleCreatorModal').style.display = 'block';
+}
+
 function closeScheduleCreator() { document.getElementById('scheduleCreatorModal').style.display = 'none'; }
 
 function logActivity(message) {
@@ -429,7 +499,12 @@ for (let s=0; s<3; s++) {
     </div>
     <p><strong>Days:</strong> ${daysText}</p>
     <p><strong>Status:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:bold;">Active</span>' : '<span style="color:var(--danger);font-weight:bold;">Paused</span>'}</p>
-    <div class="action-btns"><button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button></div>
+    
+    <div class="action-btns">
+        <button class="btn-edit" onclick="openScheduleEditor('${key}')"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button>
+    </div>
+    
     </div>
     </div>`;
 }
@@ -522,11 +597,12 @@ function toggleScheduleActive(key, isActive) {
 db.ref(`schedules/${key}/active`).set(isActive);
 logActivity(isActive ? "🗓️ Schedule Activated" : "🗓️ Schedule Paused");
 }
+
 function deleteSchedule(key) {
 if(confirm("Permanently delete this schedule?")) { db.ref(`schedules/${key}`).remove(); logActivity("🗑️ Schedule Deleted"); }
 }
 
-function saveNewSchedule() {
+function saveSchedule() {
 let timeVal = document.getElementById('sched-time').value;
 if(!timeVal) { alert("Please set a start time."); return; }
 let parts = timeVal.split(':');
@@ -548,15 +624,22 @@ if(validFerts.length > 0) zoneObj.ferts = validFerts;
 sData.zones.push(zoneObj);
 }
 
-let saveId = null;
-let schedulesObj = localSchedules || {};
-for(let i=0; i<3; i++) { if (!schedulesObj['slot_' + i]) { saveId = i; break; } }
-if (saveId === null) { alert("Maximum of 3 schedules reached. Please delete one first."); return; }
+// Check if we are updating an existing slot or creating a new one
+let targetSlotKey = null;
 
-db.ref(`schedules/slot_${saveId}`).set(sData).then(() => {
-alert("✅ Schedule Created Successfully!");
-logActivity("📝 New Schedule Created");
-closeScheduleCreator();
+if (editingSlotKey) {
+    targetSlotKey = editingSlotKey; // Re-save over the existing schedule slot
+} else {
+    // Find empty slot for a brand new schedule
+    let schedulesObj = localSchedules || {};
+    for(let i=0; i<3; i++) { if (!schedulesObj['slot_' + i]) { targetSlotKey = 'slot_' + i; break; } }
+    if (targetSlotKey === null) { alert("Maximum of 3 schedules reached. Please delete one first."); return; }
+}
+
+db.ref(`schedules/${targetSlotKey}`).set(sData).then(() => {
+    alert(editingSlotKey ? "✅ Schedule Updated Successfully!" : "✅ Schedule Created Successfully!");
+    logActivity(editingSlotKey ? "📝 Schedule Updated" : "📝 New Schedule Created");
+    closeScheduleCreator();
 }).catch(err => alert("Firebase Error: " + err));
 }
 </script>

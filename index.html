@@ -195,14 +195,6 @@ input:checked + .slider.bw-slider { background-color: var(--bw-color); }
 input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 
-/* --- NOTIFICATIONS (LOGS) --- */
-.console-log-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--border-radius); padding: 0; margin-bottom: 30px; overflow: hidden; }
-.log-header { padding: 15px 20px; border-bottom: 1px solid var(--card-border); font-weight: 700; color: var(--text-muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; display: flex; gap: 10px; align-items: center;}
-.log-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2);}
-.log-list li { font-family: var(--font-mono); font-size: 13px; padding: 12px 20px; border-bottom: 1px solid var(--card-border); color: var(--text-main); display: flex; align-items: center; }
-.log-list li:last-child { border-bottom: none; }
-.log-time { color: var(--primary); margin-right: 15px; width: 70px; flex-shrink: 0;}
-
 /* --- BOTTOM BAR --- */
 .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border-top: 1px solid var(--card-border); padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom)); display: flex; justify-content: center; z-index: 100; gap: 15px;}
 .btn-schedule { background: var(--text-main); color: var(--bg-dark); border: none; padding: 16px 24px; border-radius: 12px; font-size: 15px; font-weight: 800; cursor: pointer; width: 100%; max-width: 300px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
@@ -210,7 +202,7 @@ input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); width: 60px; padding: 0; flex-shrink: 0;}
 .btn-danger:hover { background: var(--danger); color: white; }
 
-/* --- MODALS --- */
+/* --- MODALS (Adapted to Dark Theme) --- */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-dark); z-index: 999; overflow-y: auto; animation: slideUp 0.3s ease; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .modal-header { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); padding: 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; border-bottom: 1px solid var(--card-border); z-index: 10; }
@@ -332,13 +324,6 @@ input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus {
 
     <div class="section-title">Fertilizer Compartments</div>
     <div class="grid" id="fert-grid"></div>
-
-    <div class="console-log-card">
-        <div class="log-header"><i class="fa-solid fa-terminal"></i> System Terminal Logs</div>
-        <ul class="log-list" id="activity-log">
-            <li><span class="log-time">SYS</span> UI Console Initialized</li>
-        </ul>
-    </div>
 
 </div>
 
@@ -609,15 +594,9 @@ function addFertRow(zoneIdx) {
 }
 function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-${zoneIdx}-${rowId}`); if(el) el.remove(); }
 
-// --- UI HELPERS ---
+// --- UI HELPERS (Silent Logs) ---
 function logActivity(message) {
-    let now = new Date();
-    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
-    let logList = document.getElementById('activity-log');
-    let newLi = document.createElement('li');
-    newLi.innerHTML = `<span class="log-time">${timeStr}</span> ${message}`;
-    logList.insertBefore(newLi, logList.firstChild);
-    if(logList.children.length > 50) logList.removeChild(logList.lastChild); 
+    console.log("[SIP-CONSOLE]: " + message); 
 }
 
 // --- ADVANCED COUNTDOWN LOGIC ---
@@ -901,6 +880,7 @@ function cancelManualTimer() { document.getElementById('manualTimerOverlay').sty
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
     
+    // Inject custom start timestamp for precise UI tracking
     if (pendingManualType === "irr") {
         db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, manualIrrStartTS: Date.now() });
     } else if (pendingManualType === "fert") {

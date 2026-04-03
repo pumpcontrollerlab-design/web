@@ -6,6 +6,7 @@
 <title>Smart Irrigation Console</title>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -36,23 +37,44 @@ body {
     color: var(--text-main); 
     margin: 0; 
     padding: 0; 
-    padding-bottom: 120px; 
     -webkit-font-smoothing: antialiased;
 }
 
+/* --- LOGIN SCREEN --- */
+#login-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg-dark); z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.login-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    padding: 40px 30px; border-radius: var(--border-radius); width: 90%; max-width: 360px;
+    box-shadow: var(--shadow); text-align: center;
+}
+.login-card i { font-size: 40px; color: var(--primary); margin-bottom: 15px; }
+.login-card h2 { margin: 0 0 5px 0; font-size: 22px; font-weight: 800; }
+.login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 25px; }
+.login-card input {
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; padding: 14px;
+    background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); color: var(--text-main);
+    border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px; text-align: left;
+}
+.login-card input:focus { border-color: var(--primary); outline: none; }
+.btn-login {
+    background: var(--primary); color: white; border: none; padding: 16px; width: 100%;
+    border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s;
+}
+.btn-login:active { transform: scale(0.97); }
+#login-error { color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 15px; display: none; }
+
+/* MAIN APP WRAPPER */
+#main-app { display: none; padding-bottom: 120px; }
+
 /* --- COMMAND HEADER --- */
 .header { 
-    background: rgba(15, 23, 42, 0.85); 
-    backdrop-filter: blur(12px); 
-    -webkit-backdrop-filter: blur(12px);
-    padding: 20px; 
-    position: sticky; 
-    top: 0; 
-    z-index: 100; 
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--card-border);
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    padding: 20px; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between;
+    align-items: center; border-bottom: 1px solid var(--card-border);
 }
 .brand-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
 .brand-title i { color: var(--primary); }
@@ -64,6 +86,8 @@ body {
 .status-online { background: rgba(16, 185, 129, 0.1); color: var(--fert-color); border: 1px solid var(--fert-color); }
 .status-offline { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
 .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; box-shadow: 0 0 8px currentColor; animation: pulse 2s infinite; }
+.btn-logout { background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; transition: 0.2s;}
+.btn-logout:hover { color: var(--danger); }
 
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
@@ -80,22 +104,11 @@ body {
 
 /* Telemetry Card (Hero) */
 .telemetry-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--border-radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--border-radius);
+    padding: 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden; transition: all 0.3s ease;
 }
-
-.telemetry-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--card-border); transition: 0.3s;
-}
+.telemetry-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--card-border); transition: 0.3s; }
 .telemetry-active::before { background: var(--primary); box-shadow: 0 0 15px var(--primary); }
 .telemetry-bw::before { background: var(--bw-color); box-shadow: 0 0 15px var(--bw-color); }
 
@@ -104,7 +117,6 @@ body {
 .telemetry-main-status { font-size: 28px; font-weight: 800; margin: 10px 0 5px 0; color: var(--text-main); }
 .telemetry-sub { font-size: 15px; color: var(--text-muted); font-weight: 500; }
 
-/* DUAL COUNTDOWN TIMERS */
 .timers-container { display: flex; gap: 30px; justify-content: flex-end; align-items: center; display: none;}
 .timer-box { display: flex; flex-direction: column; align-items: center; }
 .timer-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
@@ -123,34 +135,16 @@ body {
 
 /* Weather Card */
 .weather-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--border-radius);
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--border-radius);
+    padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
 }
 .weather-icon { font-size: 42px; color: #f59e0b; margin-bottom: 15px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
 .weather-temp { font-family: var(--font-mono); font-size: 36px; font-weight: 700; margin: 0; }
 .weather-desc { font-size: 14px; color: var(--text-muted); font-weight: 500; margin-top: 5px; text-transform: capitalize;}
 .weather-location { 
-    font-size: 12px; 
-    color: var(--text-muted); 
-    text-transform: uppercase; 
-    letter-spacing: 1px; 
-    margin-top: 15px; 
-    border-top: 1px solid var(--card-border); 
-    padding-top: 12px; 
-    width: 100%;
-    cursor: pointer;
-    transition: 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+    font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; 
+    margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 12px; width: 100%;
+    cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
 }
 .weather-location:hover { color: var(--text-main); }
 
@@ -159,15 +153,8 @@ body {
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-bottom: 35px; }
 
 .control-card { 
-    background: var(--card-bg); 
-    border: 1px solid var(--card-border);
-    padding: 20px; 
-    border-radius: 16px; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: flex-start; 
-    transition: all 0.2s ease;
-    position: relative;
+    background: var(--card-bg); border: 1px solid var(--card-border); padding: 20px; border-radius: 16px; 
+    display: flex; flex-direction: column; align-items: flex-start; transition: all 0.2s ease; position: relative;
 }
 
 .card-header { display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 15px; }
@@ -175,7 +162,6 @@ body {
 .card-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
 .card-status { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 6px; }
 
-/* Active Card States */
 .control-card.active-irr { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); box-shadow: 0 0 20px var(--primary-glow); }
 .control-card.active-irr .card-icon { color: var(--primary); }
 .control-card.active-irr .card-status { color: var(--primary); }
@@ -202,7 +188,7 @@ input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); width: 60px; padding: 0; flex-shrink: 0;}
 .btn-danger:hover { background: var(--danger); color: white; }
 
-/* --- MODALS (Adapted to Dark Theme) --- */
+/* --- MODALS --- */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-dark); z-index: 999; overflow-y: auto; animation: slideUp 0.3s ease; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .modal-header { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); padding: 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; border-bottom: 1px solid var(--card-border); z-index: 10; }
@@ -223,8 +209,9 @@ input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 /* Forms */
 .setup-card { background: var(--card-bg); border: 1px solid var(--card-border); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
 .setup-card h3 { margin-top: 0; font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--card-border); padding-bottom: 12px; margin-bottom: 15px; color: var(--text-muted); text-transform: uppercase;}
-input[type="time"], input[type="number"], input[type="text"] { font-family: var(--font-mono); font-size: 18px; font-weight: 700; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 8px; width: 100%; box-sizing: border-box; }
-input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus { border-color: var(--primary); outline: none; }
+input[type="email"], input[type="password"], input[type="time"], input[type="number"], input[type="text"] { font-family: var(--font-mono); font-size: 16px; font-weight: 700; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 8px; width: 100%; box-sizing: border-box; }
+input[type="time"], input[type="number"] { font-size: 18px; }
+input:focus { border-color: var(--primary); outline: none; }
 
 .day-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .day-pill { display: inline-block; padding: 8px 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
@@ -254,7 +241,6 @@ input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus {
 .btn-cancel { background: var(--card-border); color: var(--text-main); }
 .btn-confirm { background: var(--primary); color: white; }
 
-/* Scrollbar styling for dark mode */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
 ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
@@ -263,173 +249,234 @@ input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus {
 </head>
 <body>
 
-<div class="header">
-    <div class="brand-title"><i class="fa-solid fa-layer-group"></i> SIP-CONSOLE</div>
-    <div class="header-right">
-        <div class="sys-clock" id="sys-clock">00:00:00</div>
-        <div class="connection-status status-offline" id="heartbeat-display">
-            <div class="pulse-dot"></div> OFFLINE
-        </div>
-    </div>
-</div>
-
-<div class="container">
-    
-    <div class="top-dashboard">
+<div id="login-screen">
+    <div class="login-card">
+        <i class="fa-solid fa-shield-halved"></i>
+        <h2>SIP Console</h2>
+        <p>Restricted access. Please authenticate.</p>
         
-        <div class="telemetry-card" id="hero-dashboard">
-            <div class="telemetry-header">
-                <div>
-                    <h3 class="telemetry-title">System Status</h3>
-                    <div class="telemetry-main-status" id="hero-title">STANDBY</div>
-                    <div class="telemetry-sub" id="hero-subtitle">Awaiting schedule execution.</div>
-                </div>
-                
-                <div class="timers-container" id="timers-container">
-                    <div class="timer-box" id="timer-box-irr" style="display:none;">
-                        <div class="timer-label" id="timer-label-irr">ZONE REMAINING</div>
-                        <div class="live-timer" id="live-timer-irr">00:00</div>
-                    </div>
-                    <div class="timer-box" id="timer-box-bw" style="display:none;">
-                        <div class="timer-label" id="timer-label-bw" style="color:var(--bw-color);">FLUSH REMAINING</div>
-                        <div class="live-timer" id="live-timer-bw" style="color:var(--bw-color);">00:00</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="motor-status-grid">
-                <div class="motor-indicator" id="motor-main-ind">
-                    <i class="fa-solid fa-water"></i> Main Pump: OFF
-                </div>
-                <div class="motor-indicator" id="motor-fert-ind">
-                    <i class="fa-solid fa-flask"></i> Fert Pump: OFF
-                </div>
-            </div>
-        </div>
+        <input type="email" id="login-email" placeholder="Email Address">
+        <input type="password" id="login-pass" placeholder="Password">
+        <button class="btn-login" onclick="loginUser()"><i class="fa-solid fa-lock-open"></i> Access Console</button>
+        
+        <div id="login-error">Invalid credentials. Please try again.</div>
+    </div>
+</div>
 
-        <div class="weather-card">
-            <i class="fa-solid fa-cloud-sun weather-icon" id="weather-icon"></i>
-            <div class="weather-temp" id="weather-temp">--°C</div>
-            <div class="weather-desc" id="weather-desc">Fetching data...</div>
-            <div class="weather-location" onclick="openLocationModal()">
-                <i class="fa-solid fa-location-dot"></i> 
-                <span id="loc-name">Local Environment</span> 
-                <i class="fa-solid fa-pen" style="font-size:10px; margin-left:4px; opacity:0.6;"></i>
+<div id="main-app">
+
+    <div class="header">
+        <div class="brand-title"><i class="fa-solid fa-layer-group"></i> SIP-CONSOLE</div>
+        <div class="header-right">
+            <div class="sys-clock" id="sys-clock">00:00:00</div>
+            <div class="connection-status status-offline" id="heartbeat-display">
+                <div class="pulse-dot"></div> OFFLINE
             </div>
+            <button class="btn-logout" onclick="logoutUser()" title="Secure Logout"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
         </div>
     </div>
 
-    <div class="section-title">Irrigation Zones</div>
-    <div class="grid" id="irr-grid"></div>
-
-    <div class="section-title">Fertilizer Compartments</div>
-    <div class="grid" id="fert-grid"></div>
-
-</div>
-
-<div class="bottom-bar">
-    <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-solid fa-sliders"></i> AUTOMATIONS</button>
-    <button class="btn-schedule btn-danger" onclick="emergencyStop()" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
-</div>
-
-<div class="modal" id="scheduleHubModal">
-    <div class="modal-header">
-        <h2>Automations</h2>
-        <button class="close-btn" onclick="closeScheduleHub()">Done</button>
-    </div>
     <div class="container">
         
-        <div class="setup-card" style="border: 1px solid var(--bw-color);">
-            <h3 style="color: var(--bw-color); border-bottom-color: var(--card-border);"><i class="fa-solid fa-filter"></i> Auto Backwash</h3>
-            <div id="bw-schedule-display"></div>
-            <div style="margin-top: 20px; display:flex; align-items:center; justify-content:space-between; border-top: 1px solid var(--card-border); padding-top:15px;">
-                <span style="font-weight:700; font-size:14px; color:var(--text-main);">Enable Auto-Flush</span>
-                <label class="switch"><input type="checkbox" id="bw-master-toggle" onchange="toggleBackwash(this.checked)"><span class="slider bw-slider"></span></label>
+        <div class="top-dashboard">
+            <div class="telemetry-card" id="hero-dashboard">
+                <div class="telemetry-header">
+                    <div>
+                        <h3 class="telemetry-title">System Status</h3>
+                        <div class="telemetry-main-status" id="hero-title">STANDBY</div>
+                        <div class="telemetry-sub" id="hero-subtitle">Awaiting schedule execution.</div>
+                    </div>
+                    <div class="timers-container" id="timers-container">
+                        <div class="timer-box" id="timer-box-irr" style="display:none;">
+                            <div class="timer-label" id="timer-label-irr">ZONE REMAINING</div>
+                            <div class="live-timer" id="live-timer-irr">00:00</div>
+                        </div>
+                        <div class="timer-box" id="timer-box-bw" style="display:none;">
+                            <div class="timer-label" id="timer-label-bw" style="color:var(--bw-color);">FLUSH REMAINING</div>
+                            <div class="live-timer" id="live-timer-bw" style="color:var(--bw-color);">00:00</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="motor-status-grid">
+                    <div class="motor-indicator" id="motor-main-ind">
+                        <i class="fa-solid fa-water"></i> Main Pump: OFF
+                    </div>
+                    <div class="motor-indicator" id="motor-fert-ind">
+                        <i class="fa-solid fa-flask"></i> Fert Pump: OFF
+                    </div>
+                </div>
             </div>
-            <button style="width:100%; margin-top:20px; padding:12px; background:rgba(168, 85, 247, 0.1); color:var(--bw-color); border:1px solid rgba(168, 85, 247, 0.3); border-radius:8px; font-weight:700; cursor:pointer;" onclick="openBwEditor()"><i class="fa-solid fa-pen"></i> Edit Settings</button>
-        </div>
 
-        <h3 style="margin-top: 35px; font-size: 14px; font-weight: 700; color:var(--text-muted); text-transform:uppercase;">Watering Schedules</h3>
-        <div id="active-schedules-list">
-            <p style="text-align:center; color:var(--text-muted); margin-top:20px; font-family:var(--font-mono);"><i class="fa-solid fa-spinner fa-spin"></i> Loading data...</p>
-        </div>
-        <button class="btn-create" onclick="openScheduleCreator()"><i class="fa-solid fa-plus"></i> Create New Schedule</button>
-    </div>
-</div>
-
-<div class="modal" id="scheduleCreatorModal">
-    <div class="modal-header">
-        <h2 id="scheduleModalTitle">Create Schedule</h2>
-        <button class="close-btn" onclick="closeScheduleCreator()">Cancel</button>
-    </div>
-    <div class="container" style="padding-top: 10px;">
-        <div class="setup-card">
-            <h3>Start Time</h3>
-            <input type="time" id="sched-time" required>
-        </div>
-        <div class="setup-card">
-            <h3>Watering Days</h3>
-            <div class="day-selector" id="master-days"></div>
-        </div>
-        <div class="setup-card">
-            <h3>Zone & Compartment Matrix</h3>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height:1.5;">Set base watering time per zone. Add up to 4 fertilizer injections per zone.</p>
-            <div id="zone-config-container"></div>
-        </div>
-        <button class="btn-create" id="btn-save-schedule" onclick="saveSchedule()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Schedule</button>
-    </div>
-</div>
-
-<div class="modal" id="bwEditorModal">
-    <div class="modal-header">
-        <h2>Backwash Settings</h2>
-        <button class="close-btn" onclick="document.getElementById('bwEditorModal').style.display='none'">Cancel</button>
-    </div>
-    <div class="container" style="padding-top: 10px;">
-        <div class="setup-card">
-            <h3>Start Time</h3>
-            <input type="time" id="bw-time" required>
-        </div>
-        <div class="setup-card">
-            <h3>Flush Duration</h3>
-            <div class="input-group">
-                <span style="font-weight:600; font-size:14px; color:var(--text-main);">Keep valves open for</span>
-                <div style="display:flex; align-items:center;"><input type="number" id="bw-dur" min="1" value="5"> <span style="font-size:13px; font-weight:600; color:var(--text-muted); margin-left:8px;">mins</span></div>
+            <div class="weather-card">
+                <i class="fa-solid fa-cloud-sun weather-icon" id="weather-icon"></i>
+                <div class="weather-temp" id="weather-temp">--°C</div>
+                <div class="weather-desc" id="weather-desc">Fetching data...</div>
+                <div class="weather-location" onclick="openLocationModal()">
+                    <i class="fa-solid fa-location-dot"></i> 
+                    <span id="loc-name">Local Environment</span> 
+                    <i class="fa-solid fa-pen" style="font-size:10px; margin-left:4px; opacity:0.6;"></i>
+                </div>
             </div>
         </div>
-        <div class="setup-card">
-            <h3>Days to Flush</h3>
-            <div class="day-selector" id="bw-days-container"></div>
-        </div>
-        <button class="btn-create" style="background:var(--bw-color); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);" onclick="saveBwSettings()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Backwash</button>
-    </div>
-</div>
 
-<div class="overlay" id="manualTimerOverlay">
-    <div class="mini-modal">
-        <h3 id="manualTimerTitle">Manual Override</h3>
-        <p id="manualTimerDesc">Enter run duration in minutes. Leave as 0 for continuous run.</p>
-        <input type="number" id="manualTimerMins" min="0" value="10">
-        <div class="mini-modal-btns">
-            <button class="btn-cancel" onclick="cancelManualTimer()">Cancel</button>
-            <button class="btn-confirm" id="manualTimerConfirmBtn" onclick="confirmManualTimer()">Start</button>
+        <div class="section-title">Irrigation Zones</div>
+        <div class="grid" id="irr-grid"></div>
+
+        <div class="section-title">Fertilizer Compartments</div>
+        <div class="grid" id="fert-grid"></div>
+    </div>
+
+    <div class="bottom-bar">
+        <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-solid fa-sliders"></i> AUTOMATIONS</button>
+        <button class="btn-schedule btn-danger" onclick="emergencyStop()" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
+    </div>
+
+    <div class="modal" id="scheduleHubModal">
+        <div class="modal-header">
+            <h2>Automations</h2>
+            <button class="close-btn" onclick="closeScheduleHub()">Done</button>
+        </div>
+        <div class="container">
+            <div class="setup-card" style="border: 1px solid var(--bw-color);">
+                <h3 style="color: var(--bw-color); border-bottom-color: var(--card-border);"><i class="fa-solid fa-filter"></i> Auto Backwash</h3>
+                <div id="bw-schedule-display"></div>
+                <div style="margin-top: 20px; display:flex; align-items:center; justify-content:space-between; border-top: 1px solid var(--card-border); padding-top:15px;">
+                    <span style="font-weight:700; font-size:14px; color:var(--text-main);">Enable Auto-Flush</span>
+                    <label class="switch"><input type="checkbox" id="bw-master-toggle" onchange="toggleBackwash(this.checked)"><span class="slider bw-slider"></span></label>
+                </div>
+                <button style="width:100%; margin-top:20px; padding:12px; background:rgba(168, 85, 247, 0.1); color:var(--bw-color); border:1px solid rgba(168, 85, 247, 0.3); border-radius:8px; font-weight:700; cursor:pointer;" onclick="openBwEditor()"><i class="fa-solid fa-pen"></i> Edit Settings</button>
+            </div>
+            <h3 style="margin-top: 35px; font-size: 14px; font-weight: 700; color:var(--text-muted); text-transform:uppercase;">Watering Schedules</h3>
+            <div id="active-schedules-list">
+                <p style="text-align:center; color:var(--text-muted); margin-top:20px; font-family:var(--font-mono);"><i class="fa-solid fa-spinner fa-spin"></i> Loading data...</p>
+            </div>
+            <button class="btn-create" onclick="openScheduleCreator()"><i class="fa-solid fa-plus"></i> Create New Schedule</button>
         </div>
     </div>
-</div>
 
-<div class="overlay" id="locationModalOverlay">
-    <div class="mini-modal">
-        <h3>Set Weather Location</h3>
-        <p>Enter your city name to fetch live weather data.</p>
-        <input type="text" id="cityInput" placeholder="e.g., London, Dubai">
-        <div class="mini-modal-btns">
-            <button class="btn-cancel" onclick="document.getElementById('locationModalOverlay').style.display='none'">Cancel</button>
-            <button class="btn-confirm" onclick="saveLocation()">Search</button>
+    <div class="modal" id="scheduleCreatorModal">
+        <div class="modal-header">
+            <h2 id="scheduleModalTitle">Create Schedule</h2>
+            <button class="close-btn" onclick="closeScheduleCreator()">Cancel</button>
+        </div>
+        <div class="container" style="padding-top: 10px;">
+            <div class="setup-card">
+                <h3>Start Time</h3>
+                <input type="time" id="sched-time" required>
+            </div>
+            <div class="setup-card">
+                <h3>Watering Days</h3>
+                <div class="day-selector" id="master-days"></div>
+            </div>
+            <div class="setup-card">
+                <h3>Zone & Compartment Matrix</h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height:1.5;">Set base watering time per zone. Add up to 4 fertilizer injections per zone.</p>
+                <div id="zone-config-container"></div>
+            </div>
+            <button class="btn-create" id="btn-save-schedule" onclick="saveSchedule()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Schedule</button>
         </div>
     </div>
-</div>
 
-<script>
+    <div class="modal" id="bwEditorModal">
+        <div class="modal-header">
+            <h2>Backwash Settings</h2>
+            <button class="close-btn" onclick="document.getElementById('bwEditorModal').style.display='none'">Cancel</button>
+        </div>
+        <div class="container" style="padding-top: 10px;">
+            <div class="setup-card">
+                <h3>Start Time</h3>
+                <input type="time" id="bw-time" required>
+            </div>
+            <div class="setup-card">
+                <h3>Flush Duration</h3>
+                <div class="input-group">
+                    <span style="font-weight:600; font-size:14px; color:var(--text-main);">Keep valves open for</span>
+                    <div style="display:flex; align-items:center;"><input type="number" id="bw-dur" min="1" value="5"> <span style="font-size:13px; font-weight:600; color:var(--text-muted); margin-left:8px;">mins</span></div>
+                </div>
+            </div>
+            <div class="setup-card">
+                <h3>Days to Flush</h3>
+                <div class="day-selector" id="bw-days-container"></div>
+            </div>
+            <button class="btn-create" style="background:var(--bw-color); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);" onclick="saveBwSettings()" style="margin-bottom: 50px;"><i class="fa-solid fa-check"></i> Save Backwash</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="manualTimerOverlay">
+        <div class="mini-modal">
+            <h3 id="manualTimerTitle">Manual Override</h3>
+            <p id="manualTimerDesc">Enter run duration in minutes. Leave as 0 for continuous run.</p>
+            <input type="number" id="manualTimerMins" min="0" value="10">
+            <div class="mini-modal-btns">
+                <button class="btn-cancel" onclick="cancelManualTimer()">Cancel</button>
+                <button class="btn-confirm" id="manualTimerConfirmBtn" onclick="confirmManualTimer()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="locationModalOverlay">
+        <div class="mini-modal">
+            <h3>Set Weather Location</h3>
+            <p>Enter your city name to fetch live weather data.</p>
+            <input type="text" id="cityInput" placeholder="e.g., London, Dubai">
+            <div class="mini-modal-btns">
+                <button class="btn-cancel" onclick="document.getElementById('locationModalOverlay').style.display='none'">Cancel</button>
+                <button class="btn-confirm" onclick="saveLocation()">Search</button>
+            </div>
+        </div>
+    </div>
+
+</div> <script>
+// --- FIREBASE INIT ---
+const firebaseConfig = {
+    apiKey: "AIzaSyAbfqRl4T3cv6cjZz9wT9J9cOjOenp-UJY",
+    databaseURL: "https://smart-irrigation-c039f-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+// --- AUTHENTICATION LOGIC ---
+const loginScreen = document.getElementById('login-screen');
+const mainApp = document.getElementById('main-app');
+const loginError = document.getElementById('login-error');
+
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        // Logged In -> Show App, Hide Login
+        loginScreen.style.display = 'none';
+        mainApp.style.display = 'block';
+        initAppListeners(); // Start pulling data
+    } else {
+        // Logged Out -> Show Login, Hide App
+        loginScreen.style.display = 'flex';
+        mainApp.style.display = 'none';
+    }
+});
+
+function loginUser() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value.trim();
+    loginError.style.display = 'none';
+    
+    if(!email || !pass) {
+        loginError.innerText = "Please enter email and password.";
+        loginError.style.display = 'block';
+        return;
+    }
+    
+    auth.signInWithEmailAndPassword(email, pass).catch((error) => {
+        loginError.innerText = "Invalid credentials. Please check your Firebase setup.";
+        loginError.style.display = 'block';
+        console.error("Auth Error:", error);
+    });
+}
+
+function logoutUser() {
+    auth.signOut();
+}
+
 // --- CLOCK & WEATHER ---
 function updateClock() {
     const now = new Date();
@@ -501,14 +548,8 @@ async function fetchWeather() {
 fetchWeather();
 setInterval(fetchWeather, 3600000); 
 
-// --- FIREBASE INIT ---
-const firebaseConfig = {
-    apiKey: "AIzaSyAbfqRl4T3cv6cjZz9wT9J9cOjOenp-UJY",
-    databaseURL: "https://smart-irrigation-c039f-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
 
+// --- APP LOGIC (Variables & UI Building) ---
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const dayVals = [1, 2, 4, 8, 16, 32, 64];
 
@@ -520,7 +561,7 @@ let pendingManualType = "";
 let pendingManualId = 0;
 let editingSlotKey = null; 
 
-// --- BUILD UI GRIDS ---
+// Build UI Grids
 for(let i=1; i<=6; i++) {
     document.getElementById('irr-grid').innerHTML += `
     <div class="control-card" id="card-irr-${i}">
@@ -594,261 +635,178 @@ function addFertRow(zoneIdx) {
 }
 function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-${zoneIdx}-${rowId}`); if(el) el.remove(); }
 
-// --- UI HELPERS (Silent Logs) ---
-function logActivity(message) {
-    console.log("[SIP-CONSOLE]: " + message); 
-}
+function logActivity(message) { console.log("[SIP-CONSOLE]: " + message); }
 
-// --- ADVANCED COUNTDOWN LOGIC ---
-function getScheduledEndTime(id) {
-    let now = new Date();
-    let currentDayMask = dayVals[now.getDay()];
-    let currentMs = now.getTime();
-    let buffer = 180000; // 3-minute mathematical buffer 
-
-    for (let s = 0; s < 3; s++) {
-        let sched = localSchedules['slot_' + s];
-        if (!sched || !sched.active || !(sched.days & currentDayMask)) continue;
-
-        let schedStart = new Date(now);
-        schedStart.setHours(sched.hour, sched.minute, 0, 0);
-        let currentEpoch = schedStart.getTime();
-
-        for (let z = 0; z < 6; z++) {
-            if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
-            let zoneStart = currentEpoch;
-            let zoneEnd = zoneStart + (sched.zones[z].waterMins * 60000);
-            
-            if (id === (z + 1) && currentMs >= (zoneStart - buffer) && currentMs <= (zoneEnd + buffer)) {
-                return zoneEnd;
+// --- DATABASE LISTENERS (Called ONLY when Logged In) ---
+function initAppListeners() {
+    
+    function getScheduledEndTime(id) {
+        let now = new Date(); let currentDayMask = dayVals[now.getDay()]; let currentMs = now.getTime(); let buffer = 180000; 
+        for (let s = 0; s < 3; s++) {
+            let sched = localSchedules['slot_' + s];
+            if (!sched || !sched.active || !(sched.days & currentDayMask)) continue;
+            let schedStart = new Date(now); schedStart.setHours(sched.hour, sched.minute, 0, 0);
+            let currentEpoch = schedStart.getTime();
+            for (let z = 0; z < 6; z++) {
+                if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
+                let zoneEnd = currentEpoch + (sched.zones[z].waterMins * 60000);
+                if (id === (z + 1) && currentMs >= (currentEpoch - buffer) && currentMs <= (zoneEnd + buffer)) return zoneEnd;
+                currentEpoch = zoneEnd;
             }
-            currentEpoch = zoneEnd;
         }
-    }
-    return null;
-}
-
-function getBwEndTime() {
-    if (!localBwConfig || !localBwConfig.active) return null;
-    let now = new Date();
-    let currentDayMask = dayVals[now.getDay()];
-    if (!(localBwConfig.days & currentDayMask)) return null;
-
-    let schedStart = new Date(now);
-    schedStart.setHours(localBwConfig.hour, localBwConfig.minute, 0, 0);
-    let startMs = schedStart.getTime();
-    let endMs = startMs + (localBwConfig.durationMins * 60000);
-
-    let currentMs = now.getTime();
-    let buffer = 180000; 
-
-    if (currentMs >= (startMs - buffer) && currentMs <= (endMs + buffer)) return endMs;
-    return null;
-}
-
-setInterval(() => {
-    if (!currentSysState) return;
-
-    let irrEnd = null;
-    let bwEnd = null;
-
-    if (currentSysState.isBackwashActive) {
-        bwEnd = getBwEndTime();
-    } else {
-        if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
-            irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
-        } else if (currentSysState.activeIrrZone > 0) {
-            irrEnd = getScheduledEndTime(currentSysState.activeIrrZone);
-        }
+        return null;
     }
 
-    updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrZone, currentSysState.manualIrrMins);
-    
-    let bwActiveFlag = currentSysState.isBackwashActive ? 1 : 0;
-    updateCountdownUI('timer-box-bw', 'timer-label-bw', 'live-timer-bw', bwEnd, bwActiveFlag, "BACKWASH", 0, 1);
-}, 1000);
+    function getBwEndTime() {
+        if (!localBwConfig || !localBwConfig.active) return null;
+        let now = new Date(); let currentDayMask = dayVals[now.getDay()];
+        if (!(localBwConfig.days & currentDayMask)) return null;
+        let schedStart = new Date(now); schedStart.setHours(localBwConfig.hour, localBwConfig.minute, 0, 0);
+        let endMs = schedStart.getTime() + (localBwConfig.durationMins * 60000);
+        if (now.getTime() >= (schedStart.getTime() - 180000) && now.getTime() <= (endMs + 180000)) return endMs;
+        return null;
+    }
 
-function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualZoneFlag, manualMinsCheck) {
-    let box = document.getElementById(boxId);
-    let label = document.getElementById(labelId);
-    let timer = document.getElementById(timerId);
-    
-    if (activeId > 0) {
-        box.style.display = "flex";
-        
-        let labelText = prefix === "BACKWASH" ? "FLUSH REMAINING" : `${prefix} ${activeId} REMAINING`;
-        let activeText = prefix === "BACKWASH" ? "BACKWASH ACTIVE" : `${prefix} ${activeId} ACTIVE`;
+    setInterval(() => {
+        if (!currentSysState) return;
+        let irrEnd = null; let bwEnd = null;
 
-        if (manualZoneFlag > 0 && manualMinsCheck === 0) {
-            label.innerText = activeText;
-            timer.innerText = "CONT.";
-            timer.style.fontSize = "22px";
-            timer.style.lineHeight = "38px";
-        } else if (endTime) {
-            let rem = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-            let m = Math.floor(rem / 60).toString().padStart(2, '0');
-            let s = (rem % 60).toString().padStart(2, '0');
-            
-            label.innerText = labelText;
-            timer.innerText = `${m}:${s}`;
-            timer.style.fontSize = "32px";
-            timer.style.lineHeight = "normal";
+        if (currentSysState.isBackwashActive) {
+            bwEnd = getBwEndTime();
         } else {
-            label.innerText = activeText;
-            timer.innerText = "--:--";
-            timer.style.fontSize = "32px";
-            timer.style.lineHeight = "normal";
+            if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
+                irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
+            } else if (currentSysState.activeIrrZone > 0) {
+                irrEnd = getScheduledEndTime(currentSysState.activeIrrZone);
+            }
         }
-    } else {
-        box.style.display = "none";
+
+        updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrZone, currentSysState.manualIrrMins);
+        let bwActiveFlag = currentSysState.isBackwashActive ? 1 : 0;
+        updateCountdownUI('timer-box-bw', 'timer-label-bw', 'live-timer-bw', bwEnd, bwActiveFlag, "BACKWASH", 0, 1);
+    }, 1000);
+
+    function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualZoneFlag, manualMinsCheck) {
+        let box = document.getElementById(boxId); let label = document.getElementById(labelId); let timer = document.getElementById(timerId);
+        if (activeId > 0) {
+            box.style.display = "flex";
+            let labelText = prefix === "BACKWASH" ? "FLUSH REMAINING" : `${prefix} ${activeId} REMAINING`;
+            let activeText = prefix === "BACKWASH" ? "BACKWASH ACTIVE" : `${prefix} ${activeId} ACTIVE`;
+
+            if (manualZoneFlag > 0 && manualMinsCheck === 0) {
+                label.innerText = activeText; timer.innerText = "CONT.";
+                timer.style.fontSize = "22px"; timer.style.lineHeight = "38px";
+            } else if (endTime) {
+                let rem = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+                timer.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
+                label.innerText = labelText; timer.style.fontSize = "32px"; timer.style.lineHeight = "normal";
+            } else {
+                label.innerText = activeText; timer.innerText = "--:--";
+                timer.style.fontSize = "32px"; timer.style.lineHeight = "normal";
+            }
+        } else {
+            box.style.display = "none";
+        }
     }
+
+    db.ref('system').on('value', (snap) => {
+        const sys = snap.val() || {}; currentSysState = sys;
+        let isBw = sys.isBackwashActive === true; let activeIrr = sys.activeIrrZone || 0; let activeFert = sys.activeFertZone || 0;
+        
+        const hero = document.getElementById('hero-dashboard');
+        const motorMain = document.getElementById('motor-main-ind'); const motorFert = document.getElementById('motor-fert-ind');
+        
+        hero.className = "telemetry-card";
+        motorMain.className = "motor-indicator"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
+        motorFert.className = "motor-indicator"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
+        
+        if (sys.pump1Active) { motorMain.className = "motor-indicator motor-on m-main"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: ON`; }
+        if (sys.fertPumpActive) { motorFert.className = "motor-indicator motor-on m-fert"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: ON`; }
+
+        if (isBw) {
+            hero.className = "telemetry-card telemetry-bw";
+            document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)";
+            document.getElementById('hero-subtitle').innerText = "System valves are safely locked.";
+        } else if (activeIrr > 0 || activeFert > 0) {
+            hero.className = "telemetry-card telemetry-active";
+            let titleStr = "";
+            if (activeIrr > 0) titleStr += `ZONE ${activeIrr} `;
+            if (activeFert > 0) titleStr += `| COMPARTMENT ${activeFert}`;
+            document.getElementById('hero-title').innerText = titleStr; document.getElementById('hero-title').style.color = "var(--text-main)";
+            document.getElementById('hero-subtitle').innerText = "Live System Telemetry";
+        } else {
+            document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)";
+            document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution.";
+        }
+
+        for(let i=1; i<=6; i++) {
+            let isON = (activeIrr === i); let toggle = document.getElementById(`toggle-irr-${i}`);
+            if(sys.manualIrrZone === i) toggle.checked = true; else toggle.checked = false;
+            document.getElementById(`card-irr-${i}`).className = isON ? "control-card active-irr" : "control-card";
+            document.getElementById(`status-irr-${i}`).innerText = isON ? "FLOW ACTIVE" : "STANDBY";
+            toggle.disabled = isBw;
+        }
+        
+        for(let i=1; i<=4; i++) {
+            let isON = (activeFert === i); let toggle = document.getElementById(`toggle-fert-${i}`);
+            if(sys.manualFertZone === i) toggle.checked = true; else toggle.checked = false;
+            document.getElementById(`card-fert-${i}`).className = isON ? "control-card active-fert" : "control-card";
+            document.getElementById(`status-fert-${i}`).innerText = isON ? "INJECTING" : "STANDBY";
+            toggle.disabled = isBw;
+        }
+
+        let hb = document.getElementById('heartbeat-display');
+        if((Math.floor(Date.now()/1000) - (sys.heartbeat || 0)) < 15) { 
+            hb.className = "connection-status status-online"; hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`; 
+        } else { 
+            hb.className = "connection-status status-offline"; hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`; 
+        }
+    });
+
+    db.ref('schedules').on('value', (snap) => {
+        let data = snap.val() || {}; localSchedules = data;
+        if (data.backwash) {
+            localBwConfig = data.backwash;
+            document.getElementById('bw-master-toggle').checked = localBwConfig.active;
+            let hh = String(localBwConfig.hour).padStart(2, '0'); let mm = String(localBwConfig.minute).padStart(2, '0');
+            let bwDays = []; for(let i=0; i<7; i++) { if((localBwConfig.days & dayVals[i]) !== 0) bwDays.push(dayNames[i]); }
+            let dText = bwDays.length === 7 ? "Everyday" : (bwDays.length === 0 ? "No Days" : bwDays.join(", "));
+            
+            document.getElementById('bw-schedule-display').innerHTML = `
+                <p style="font-size:14px; margin:5px 0; font-family:var(--font-mono); color:var(--text-main);"><strong>EXEC TIME:</strong> ${hh}:${mm} <span style="color:var(--text-muted);">(${localBwConfig.durationMins}m)</span></p>
+                <p style="font-size:13px; margin:5px 0; color:var(--text-muted);"><strong>DAYS:</strong> ${dText}</p>
+            `;
+        }
+
+        const listDiv = document.getElementById('active-schedules-list'); listDiv.innerHTML = ""; let hasSchedules = false;
+        for (let s=0; s<3; s++) {
+            let key = 'slot_' + s; let sched = data[key];
+            if (!sched || sched.hour === undefined) continue; hasSchedules = true;
+            let hh = String(sched.hour).padStart(2, '0'); let mm = String(sched.minute).padStart(2, '0');
+            let activeDays = []; for(let i=0; i<7; i++) { if((sched.days & dayVals[i]) !== 0) activeDays.push(dayNames[i]); }
+            let dText = activeDays.length === 7 ? "Everyday" : activeDays.join(", ");
+
+            listDiv.innerHTML += `
+            <div class="schedule-card">
+                <div class="schedule-header-row">
+                    <div class="schedule-info"><h4><i class="fa-regular fa-clock" style="color:var(--text-muted); font-size:18px;"></i> ${hh}:${mm}</h4></div>
+                    <label class="switch"><input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive('${key}', this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="schedule-info">
+                    <p><strong>DAYS:</strong> ${dText}</p>
+                    <p><strong>STATUS:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:700;">ACTIVE</span>' : '<span style="color:var(--danger);font-weight:700;">INACTIVE</span>'}</p>
+                </div>
+                <div class="action-btns">
+                    <button class="btn-edit" onclick="openScheduleEditor('${key}')"><i class="fa-solid fa-pen"></i> Edit</button>
+                    <button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                </div>
+            </div>`;
+        }
+        if (!hasSchedules) listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px; font-weight:600;">No schedules configured.</p>`;
+    });
 }
 
-// --- SYSTEM SYNC (TELEMETRY) ---
-let lastState = {};
-db.ref('system').on('value', (snap) => {
-    const sys = snap.val() || {};
-    currentSysState = sys;
-
-    let isBw = sys.isBackwashActive === true;
-    let activeIrr = sys.activeIrrZone || 0;
-    let activeFert = sys.activeFertZone || 0;
-    
-    const hero = document.getElementById('hero-dashboard');
-    const heroTitle = document.getElementById('hero-title');
-    const heroSub = document.getElementById('hero-subtitle');
-    const motorMain = document.getElementById('motor-main-ind');
-    const motorFert = document.getElementById('motor-fert-ind');
-    
-    hero.className = "telemetry-card";
-    motorMain.className = "motor-indicator";
-    motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
-    motorFert.className = "motor-indicator";
-    motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
-    
-    if (sys.pump1Active) { motorMain.className = "motor-indicator motor-on m-main"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: ON`; }
-    if (sys.fertPumpActive) { motorFert.className = "motor-indicator motor-on m-fert"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: ON`; }
-
-    if (isBw) {
-        hero.className = "telemetry-card telemetry-bw";
-        heroTitle.innerText = "BACKWASH ACTIVE";
-        heroTitle.style.color = "var(--bw-color)";
-        heroSub.innerText = "System valves are safely locked.";
-    } else if (activeIrr > 0 || activeFert > 0) {
-        hero.className = "telemetry-card telemetry-active";
-        let titleStr = "";
-        if (activeIrr > 0) titleStr += `ZONE ${activeIrr} `;
-        if (activeFert > 0) titleStr += `| COMPARTMENT ${activeFert}`;
-        heroTitle.innerText = titleStr;
-        heroTitle.style.color = "var(--text-main)";
-        heroSub.innerText = "Live System Telemetry";
-    } else {
-        heroTitle.innerText = "STANDBY";
-        heroTitle.style.color = "var(--text-main)";
-        heroSub.innerText = "Awaiting schedule execution.";
-    }
-
-    for(let i=1; i<=6; i++) {
-        let isON = (activeIrr === i);
-        let toggle = document.getElementById(`toggle-irr-${i}`);
-        let card = document.getElementById(`card-irr-${i}`);
-        let status = document.getElementById(`status-irr-${i}`);
-        if(sys.manualIrrZone === i) toggle.checked = true;
-        else toggle.checked = false;
-        
-        card.className = isON ? "control-card active-irr" : "control-card";
-        status.innerText = isON ? "FLOW ACTIVE" : "STANDBY";
-        toggle.disabled = isBw;
-    }
-    
-    for(let i=1; i<=4; i++) {
-        let isON = (activeFert === i);
-        let toggle = document.getElementById(`toggle-fert-${i}`);
-        let card = document.getElementById(`card-fert-${i}`);
-        let status = document.getElementById(`status-fert-${i}`);
-        if(sys.manualFertZone === i) toggle.checked = true;
-        else toggle.checked = false;
-        
-        card.className = isON ? "control-card active-fert" : "control-card";
-        status.innerText = isON ? "INJECTING" : "STANDBY";
-        toggle.disabled = isBw;
-    }
-
-    if(sys.manualIrrZone !== lastState.irr && sys.manualIrrZone > 0) logActivity(`[CMD] Manual Water: Zone ${sys.manualIrrZone} Triggered`);
-    if(sys.manualFertZone !== lastState.fert && sys.manualFertZone > 0) logActivity(`[CMD] Manual Fert: Compartment ${sys.manualFertZone} Triggered`);
-    lastState.irr = sys.manualIrrZone; lastState.fert = sys.manualFertZone;
-
-    let diff = Math.floor(Date.now()/1000) - (sys.heartbeat || 0);
-    let hb = document.getElementById('heartbeat-display');
-    if(diff < 15) { 
-        hb.className = "connection-status status-online";
-        hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`; 
-    } else { 
-        hb.className = "connection-status status-offline";
-        hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`; 
-    }
-});
-
-
-// --- SCHEDULE SYNC & FUNCTIONS ---
-db.ref('schedules').on('value', (snap) => {
-    let data = snap.val() || {};
-    localSchedules = data;
-
-    if (data.backwash) {
-        localBwConfig = data.backwash;
-        document.getElementById('bw-master-toggle').checked = localBwConfig.active;
-        let hh = String(localBwConfig.hour).padStart(2, '0');
-        let mm = String(localBwConfig.minute).padStart(2, '0');
-        let bwDays = [];
-        for(let i=0; i<7; i++) { if((localBwConfig.days & dayVals[i]) !== 0) bwDays.push(dayNames[i]); }
-        let dText = bwDays.length === 7 ? "Everyday" : (bwDays.length === 0 ? "No Days" : bwDays.join(", "));
-        
-        document.getElementById('bw-schedule-display').innerHTML = `
-            <p style="font-size:14px; margin:5px 0; font-family:var(--font-mono); color:var(--text-main);"><strong>EXEC TIME:</strong> ${hh}:${mm} <span style="color:var(--text-muted);">(${localBwConfig.durationMins}m)</span></p>
-            <p style="font-size:13px; margin:5px 0; color:var(--text-muted);"><strong>DAYS:</strong> ${dText}</p>
-        `;
-    }
-
-    const listDiv = document.getElementById('active-schedules-list');
-    listDiv.innerHTML = "";
-    let hasSchedules = false;
-
-    for (let s=0; s<3; s++) {
-        let key = 'slot_' + s;
-        let sched = data[key];
-        if (!sched || sched.hour === undefined) continue;
-        hasSchedules = true;
-
-        let hh = String(sched.hour).padStart(2, '0');
-        let mm = String(sched.minute).padStart(2, '0');
-        let activeDays = [];
-        for(let i=0; i<7; i++) { if((sched.days & dayVals[i]) !== 0) activeDays.push(dayNames[i]); }
-        let dText = activeDays.length === 7 ? "Everyday" : activeDays.join(", ");
-
-        listDiv.innerHTML += `
-        <div class="schedule-card">
-            <div class="schedule-header-row">
-                <div class="schedule-info">
-                    <h4><i class="fa-regular fa-clock" style="color:var(--text-muted); font-size:18px;"></i> ${hh}:${mm}</h4>
-                </div>
-                <label class="switch"><input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive('${key}', this.checked)"><span class="slider"></span></label>
-            </div>
-            <div class="schedule-info">
-                <p><strong>DAYS:</strong> ${dText}</p>
-                <p><strong>STATUS:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:700;">ACTIVE</span>' : '<span style="color:var(--danger);font-weight:700;">INACTIVE</span>'}</p>
-            </div>
-            <div class="action-btns">
-                <button class="btn-edit" onclick="openScheduleEditor('${key}')"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button>
-            </div>
-        </div>`;
-    }
-
-    if (!hasSchedules) listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px; font-weight:600;">No schedules configured.</p>`;
-});
-
-// --- MANUAL OVERRIDES ---
+// --- OVERRIDE & MODAL ACTIONS ---
 function handleManualIrr(zoneNum, isChecked) { 
     if(currentSysState.isBackwashActive) return; 
     if (isChecked) {
@@ -876,92 +834,58 @@ function handleManualFert(compNum, isChecked) {
 }
 
 function cancelManualTimer() { document.getElementById('manualTimerOverlay').style.display = "none"; }
-
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
-    
-    // Inject custom start timestamp for precise UI tracking
-    if (pendingManualType === "irr") {
-        db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, manualIrrStartTS: Date.now() });
-    } else if (pendingManualType === "fert") {
-        db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins, manualFertStartTS: Date.now() });
-    }
+    if (pendingManualType === "irr") db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, manualIrrStartTS: Date.now() });
+    else if (pendingManualType === "fert") db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins, manualFertStartTS: Date.now() });
     cancelManualTimer();
 }
 
 function emergencyStop() {
-  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES?")) {
-    db.ref('system/emergencyStop').set(true);
-    logActivity("[ALERT] SYSTEM EMERGENCY STOP TRIGGERED");
-  }
+  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES?")) { db.ref('system/emergencyStop').set(true); logActivity("[ALERT] SYSTEM EMERGENCY STOP"); }
 }
 
-// --- MODAL CONTROLS & SAVING ---
 function openScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'block'; }
 function closeScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'none'; }
 
 function openBwEditor() {
-    let hh = String(localBwConfig.hour || 6).padStart(2, '0');
-    let mm = String(localBwConfig.minute || 0).padStart(2, '0');
-    document.getElementById('bw-time').value = `${hh}:${mm}`;
+    document.getElementById('bw-time').value = `${String(localBwConfig.hour || 6).padStart(2, '0')}:${String(localBwConfig.minute || 0).padStart(2, '0')}`;
     document.getElementById('bw-dur').value = localBwConfig.durationMins || 5;
     document.querySelectorAll('.bw-day-val').forEach(cb => { cb.checked = ((localBwConfig.days & parseInt(cb.value)) !== 0); });
     document.getElementById('bwEditorModal').style.display = 'block';
 }
 
 function saveBwSettings() {
-    let timeVal = document.getElementById('bw-time').value;
-    if(!timeVal) { alert("Execution time required."); return; }
-    let parts = timeVal.split(':');
+    let timeVal = document.getElementById('bw-time').value; if(!timeVal) return;
     let daysMask = 0; document.querySelectorAll('.bw-day-val:checked').forEach(cb => daysMask += parseInt(cb.value));
-    
-    db.ref('schedules/backwash').update({
-        hour: parseInt(parts[0]), minute: parseInt(parts[1]), durationMins: parseInt(document.getElementById('bw-dur').value) || 5, days: daysMask
-    }).then(() => { document.getElementById('bwEditorModal').style.display = 'none'; logActivity("[SYS] Backwash Params Updated"); });
+    db.ref('schedules/backwash').update({ hour: parseInt(timeVal.split(':')[0]), minute: parseInt(timeVal.split(':')[1]), durationMins: parseInt(document.getElementById('bw-dur').value) || 5, days: daysMask }).then(() => { document.getElementById('bwEditorModal').style.display = 'none'; });
 }
 
-function toggleBackwash(isActive) { db.ref('schedules/backwash/active').set(isActive); logActivity(`[SYS] Backwash ${isActive ? 'ACTIVE' : 'INACTIVE'}`);}
-function toggleScheduleActive(key, isActive) { db.ref(`schedules/${key}/active`).set(isActive); logActivity(`[SYS] Schedule ${key} ${isActive ? 'ACTIVE' : 'INACTIVE'}`);}
-function deleteSchedule(key) { if(confirm("Permanently purge this automation?")) { db.ref(`schedules/${key}`).remove(); logActivity(`[SYS] Schedule ${key} PURGED`);} }
+function toggleBackwash(isActive) { db.ref('schedules/backwash/active').set(isActive); }
+function toggleScheduleActive(key, isActive) { db.ref(`schedules/${key}/active`).set(isActive); }
+function deleteSchedule(key) { if(confirm("Permanently purge this automation?")) db.ref(`schedules/${key}`).remove(); }
 
 function resetScheduleForm() {
-    document.getElementById('sched-time').value = "";
-    document.querySelectorAll('.m-day').forEach(cb => cb.checked = false);
-    for(let z=0; z<6; z++) {
-        document.getElementById(`z-irrDur-${z}`).value = 0;
-        document.getElementById(`fert-container-${z}`).innerHTML = "";
-        fertCounts[z] = 0;
-    }
+    document.getElementById('sched-time').value = ""; document.querySelectorAll('.m-day').forEach(cb => cb.checked = false);
+    for(let z=0; z<6; z++) { document.getElementById(`z-irrDur-${z}`).value = 0; document.getElementById(`fert-container-${z}`).innerHTML = ""; fertCounts[z] = 0; }
 }
 
 function openScheduleCreator() { 
-    editingSlotKey = null; 
-    document.getElementById('scheduleModalTitle').innerText = "New Automation";
-    document.getElementById('btn-save-schedule').innerHTML = '<i class="fa-solid fa-check"></i> Write to Console';
-    resetScheduleForm();
-    document.getElementById('scheduleCreatorModal').style.display = 'block'; 
+    editingSlotKey = null; document.getElementById('scheduleModalTitle').innerText = "New Automation"; resetScheduleForm(); document.getElementById('scheduleCreatorModal').style.display = 'block'; 
 }
 
 function openScheduleEditor(key) {
-    let sched = localSchedules[key];
-    if (!sched) return;
-    editingSlotKey = key; 
-    document.getElementById('scheduleModalTitle').innerText = "Modify Automation";
-    document.getElementById('btn-save-schedule').innerHTML = '<i class="fa-solid fa-check"></i> Update Console';
-    resetScheduleForm(); 
-
+    let sched = localSchedules[key]; if (!sched) return;
+    editingSlotKey = key; document.getElementById('scheduleModalTitle').innerText = "Modify Automation"; resetScheduleForm(); 
     document.getElementById('sched-time').value = `${String(sched.hour).padStart(2, '0')}:${String(sched.minute).padStart(2, '0')}`;
     document.querySelectorAll('.m-day').forEach(cb => cb.checked = ((sched.days & parseInt(cb.value)) !== 0));
-
     for(let z=0; z<6; z++) {
         if(sched.zones && sched.zones[z]) {
             document.getElementById(`z-irrDur-${z}`).value = sched.zones[z].waterMins || 0;
             if(sched.zones[z].ferts) {
                 sched.zones[z].ferts.forEach((fert) => {
-                    addFertRow(z); 
-                    let rowId = fertCounts[z] - 1; 
-                    document.getElementById(`sel-comp-${z}-${rowId}`).value = fert.comp;
-                    document.getElementById(`sel-mins-${z}-${rowId}`).value = fert.mins;
+                    addFertRow(z); let rowId = fertCounts[z] - 1; 
+                    document.getElementById(`sel-comp-${z}-${rowId}`).value = fert.comp; document.getElementById(`sel-mins-${z}-${rowId}`).value = fert.mins;
                     document.querySelectorAll(`.f-day-${z}-${rowId}`).forEach(cb => cb.checked = ((fert.days & parseInt(cb.value)) !== 0));
                 });
             }
@@ -972,19 +896,15 @@ function openScheduleEditor(key) {
 function closeScheduleCreator() { document.getElementById('scheduleCreatorModal').style.display = 'none'; }
 
 function saveSchedule() {
-    let timeVal = document.getElementById('sched-time').value;
-    if(!timeVal) { alert("Execution time required."); return; }
-    let parts = timeVal.split(':');
-    let mDaysMask = 0; document.querySelectorAll('.m-day:checked').forEach(cb => mDaysMask += parseInt(cb.value));
-    if(mDaysMask === 0) { alert("Select minimum 1 execution day."); return; }
+    let timeVal = document.getElementById('sched-time').value; if(!timeVal) { alert("Execution time required."); return; }
+    let mDaysMask = 0; document.querySelectorAll('.m-day:checked').forEach(cb => mDaysMask += parseInt(cb.value)); if(mDaysMask === 0) { alert("Select minimum 1 execution day."); return; }
 
-    let sData = { active: true, hour: parseInt(parts[0]), minute: parseInt(parts[1]), days: mDaysMask, zones: [] };
+    let sData = { active: true, hour: parseInt(timeVal.split(':')[0]), minute: parseInt(timeVal.split(':')[1]), days: mDaysMask, zones: [] };
     for(let z=0; z<6; z++) {
         let zoneObj = { waterMins: parseInt(document.getElementById(`z-irrDur-${z}`).value) || 0 };
         let validFerts = [];
         for(let f=0; f<fertCounts[z]; f++) {
-            let compEl = document.getElementById(`sel-comp-${z}-${f}`);
-            if(!compEl) continue;
+            let compEl = document.getElementById(`sel-comp-${z}-${f}`); if(!compEl) continue;
             let fDaysMask = 0; document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));
             validFerts.push({ comp: parseInt(compEl.value), mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0, days: fDaysMask });
         }
@@ -998,11 +918,7 @@ function saveSchedule() {
         for(let i=0; i<3; i++) { if (!schedulesObj['slot_' + i]) { targetSlotKey = 'slot_' + i; break; } }
         if (targetSlotKey === null) { alert("Max slots reached. Purge an old automation first."); return; }
     }
-
-    db.ref(`schedules/${targetSlotKey}`).set(sData).then(() => {
-        logActivity(`[SYS] Automation ${targetSlotKey} Written`);
-        closeScheduleCreator();
-    }).catch(err => alert("Firebase Error: " + err));
+    db.ref(`schedules/${targetSlotKey}`).set(sData).then(() => { closeScheduleCreator(); });
 }
 </script>
 </body>

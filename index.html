@@ -620,11 +620,12 @@ function logActivity(message) {
     if(logList.children.length > 50) logList.removeChild(logList.lastChild); 
 }
 
-// --- ADVANCED COUNTDOWN LOGIC ---
+// --- ADVANCED COUNTDOWN LOGIC (CLOCK DRIFT FIX) ---
 function getScheduledEndTime(type, id) {
     let now = new Date();
     let currentDayMask = dayVals[now.getDay()];
     let currentMs = now.getTime();
+    let buffer = 180000; // 3-minute mathematical buffer to account for hardware delays & clock drift
 
     for (let s = 0; s < 3; s++) {
         let sched = localSchedules['slot_' + s];
@@ -639,7 +640,7 @@ function getScheduledEndTime(type, id) {
             let zoneStart = currentEpoch;
             let zoneEnd = zoneStart + (sched.zones[z].waterMins * 60000);
             
-            if (type === "irr" && id === (z + 1) && currentMs >= zoneStart && currentMs <= zoneEnd) return zoneEnd;
+            if (type === "irr" && id === (z + 1) && currentMs >= (zoneStart - buffer) && currentMs <= (zoneEnd + buffer)) return zoneEnd;
 
             let currentFertEpoch = zoneStart;
             if (sched.zones[z].ferts) {
@@ -649,7 +650,7 @@ function getScheduledEndTime(type, id) {
                         let fertEnd = currentFertEpoch + (fert.mins * 60000);
                         if (fertEnd > zoneEnd) fertEnd = zoneEnd; 
                         
-                        if (type === "fert" && id === fert.comp && currentMs >= currentFertEpoch && currentMs <= fertEnd) return fertEnd;
+                        if (type === "fert" && id === fert.comp && currentMs >= (currentFertEpoch - buffer) && currentMs <= (fertEnd + buffer)) return fertEnd;
                         currentFertEpoch = fertEnd;
                     }
                 }
@@ -665,49 +666,54 @@ setInterval(() => {
 
     let irrEnd = null;
     let fertEnd = null;
-    let bwEnd = null;
 
-    // Resolve Irrigation End Time
+    // Resolve Irrigation
     if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
         irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
     } else if (currentSysState.activeIrrZone > 0) {
         irrEnd = getScheduledEndTime("irr", currentSysState.activeIrrZone);
     }
 
-    // Resolve Fertilizer End Time
+    // Resolve Fertilizer
     if (currentSysState.manualFertZone > 0 && currentSysState.manualFertStartTS) {
         fertEnd = currentSysState.manualFertStartTS + (currentSysState.manualFertMins * 60000);
     } else if (currentSysState.activeFertZone > 0) {
         fertEnd = getScheduledEndTime("fert", currentSysState.activeFertZone);
     }
 
-    // Process UI Updates
-    updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrMins);
-    updateCountdownUI('timer-box-fert', 'timer-label-fert', 'live-timer-fert', fertEnd, currentSysState.activeFertZone, "COMP", currentSysState.manualFertMins);
+    updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrZone, currentSysState.manualIrrMins);
+    updateCountdownUI('timer-box-fert', 'timer-label-fert', 'live-timer-fert', fertEnd, currentSysState.activeFertZone, "COMP", currentSysState.manualFertZone, currentSysState.manualFertMins);
 }, 1000);
 
-function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualMinsCheck) {
+function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualZoneFlag, manualMinsCheck) {
     let box = document.getElementById(boxId);
     let label = document.getElementById(labelId);
     let timer = document.getElementById(timerId);
     
-    if (activeId > 0 && (endTime || manualMinsCheck === 0)) {
+    // Unconditional display if hardware says it's active
+    if (activeId > 0) {
         box.style.display = "flex";
         
-        // Handle manual continuous run (0 mins)
-        if ((prefix === "ZONE" && currentSysState.manualIrrZone > 0 && manualMinsCheck === 0) || 
-            (prefix === "COMP" && currentSysState.manualFertZone > 0 && manualMinsCheck === 0)) {
+        if (manualZoneFlag > 0 && manualMinsCheck === 0) {
+            // Manual Continuous Run
             label.innerText = `${prefix} ${activeId} ACTIVE`;
             timer.innerText = "CONT.";
             timer.style.fontSize = "22px";
             timer.style.lineHeight = "38px";
         } else if (endTime) {
+            // Valid Countdown
             let rem = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
             let m = Math.floor(rem / 60).toString().padStart(2, '0');
             let s = (rem % 60).toString().padStart(2, '0');
             
             label.innerText = `${prefix} ${activeId} REMAINING`;
             timer.innerText = `${m}:${s}`;
+            timer.style.fontSize = "32px";
+            timer.style.lineHeight = "normal";
+        } else {
+            // Fallback (Hardware is running, but UI math couldn't sync the exact schedule)
+            label.innerText = `${prefix} ${activeId} ACTIVE`;
+            timer.innerText = "--:--";
             timer.style.fontSize = "32px";
             timer.style.lineHeight = "normal";
         }
@@ -888,6 +894,7 @@ function handleManualFert(compNum, isChecked) {
 }
 
 function cancelManualTimer() { document.getElementById('manualTimerOverlay').style.display = "none"; }
+
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
     

@@ -14,17 +14,17 @@
 <style>
 /* --- PRO CONSOLE VARIABLES (DARK THEME) --- */
 :root { 
-    --bg-dark: #0f172a; /* Slate 900 */
-    --card-bg: #1e293b; /* Slate 800 */
-    --card-border: #334155; /* Slate 700 */
-    --primary: #3b82f6; /* Blue 500 */
+    --bg-dark: #0f172a; 
+    --card-bg: #1e293b; 
+    --card-border: #334155; 
+    --primary: #3b82f6; 
     --primary-glow: rgba(59, 130, 246, 0.4);
-    --fert-color: #10b981; /* Emerald 500 */
+    --fert-color: #10b981; 
     --fert-glow: rgba(16, 185, 129, 0.4);
-    --bw-color: #a855f7; /* Purple 500 */
-    --danger: #ef4444; /* Red 500 */
-    --text-main: #f8fafc; /* Slate 50 */
-    --text-muted: #94a3b8; /* Slate 400 */
+    --bw-color: #a855f7; 
+    --danger: #ef4444; 
+    --text-main: #f8fafc; 
+    --text-muted: #94a3b8; 
     --border-radius: 16px;
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     --font-mono: 'JetBrains Mono', monospace;
@@ -104,8 +104,15 @@ body {
 .telemetry-main-status { font-size: 28px; font-weight: 800; margin: 10px 0 5px 0; color: var(--text-main); }
 .telemetry-sub { font-size: 15px; color: var(--text-muted); font-weight: 500; }
 
-.live-timer { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: var(--primary); display: none; }
-.telemetry-active .live-timer, .telemetry-bw .live-timer { display: block; }
+/* DUAL COUNTDOWN TIMERS */
+.timers-container { display: flex; gap: 30px; justify-content: flex-end; align-items: center; display: none;}
+.timer-box { display: flex; flex-direction: column; align-items: center; }
+.timer-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.live-timer { font-family: var(--font-mono); font-size: 32px; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+
+.telemetry-active .timers-container, .telemetry-bw .timers-container { display: flex; }
+.telemetry-active .timer-label, .telemetry-bw .timer-label { color: rgba(255,255,255,0.7); }
+.telemetry-active .live-timer, .telemetry-bw .live-timer { color: #ffffff; }
 
 .motor-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; border-top: 1px solid var(--card-border); padding-top: 20px;}
 .motor-indicator { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
@@ -285,7 +292,17 @@ input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus {
                     <div class="telemetry-main-status" id="hero-title">STANDBY</div>
                     <div class="telemetry-sub" id="hero-subtitle">Awaiting schedule execution.</div>
                 </div>
-                <div class="live-timer" id="live-timer">00:00</div>
+                
+                <div class="timers-container" id="timers-container">
+                    <div class="timer-box" id="timer-box-irr" style="display:none;">
+                        <div class="timer-label" id="timer-label-irr">ZONE REMAINING</div>
+                        <div class="live-timer" id="live-timer-irr">00:00</div>
+                    </div>
+                    <div class="timer-box" id="timer-box-fert" style="display:none;">
+                        <div class="timer-label" id="timer-label-fert" style="color:var(--fert-color);">COMP REMAINING</div>
+                        <div class="live-timer" id="live-timer-fert" style="color:var(--fert-color);">00:00</div>
+                    </div>
+                </div>
             </div>
             
             <div class="motor-status-grid">
@@ -370,7 +387,7 @@ input[type="time"]:focus, input[type="number"]:focus, input[type="text"]:focus {
             <div class="day-selector" id="master-days"></div>
         </div>
         <div class="setup-card">
-            <h3>Zone & Fertilizer Matrix</h3>
+            <h3>Zone & Compartment Matrix</h3>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height:1.5;">Set base watering time per zone. Add up to 4 fertilizer injections per zone.</p>
             <div id="zone-config-container"></div>
         </div>
@@ -436,7 +453,6 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
-// Load coordinates from Local Storage (Default to Kerala if none exist)
 let weatherLat = localStorage.getItem('weatherLat') || 10.76;
 let weatherLon = localStorage.getItem('weatherLon') || 76.32;
 let weatherCity = localStorage.getItem('weatherCity') || "Chunangad, Kerala";
@@ -454,7 +470,6 @@ async function saveLocation() {
     document.getElementById('locationModalOverlay').style.display = 'none';
     
     try {
-        // Free Geocoding API from Open-Meteo
         const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
         const data = await res.json();
         
@@ -463,12 +478,11 @@ async function saveLocation() {
             weatherLon = data.results[0].longitude;
             weatherCity = data.results[0].name + (data.results[0].country ? `, ${data.results[0].country}` : "");
             
-            // Save to browser
             localStorage.setItem('weatherLat', weatherLat);
             localStorage.setItem('weatherLon', weatherLon);
             localStorage.setItem('weatherCity', weatherCity);
             
-            fetchWeather(); // Refresh weather UI
+            fetchWeather();
         } else {
             alert("City not found. Please try again.");
             document.getElementById('weather-desc').innerText = "Location Error";
@@ -500,7 +514,7 @@ async function fetchWeather() {
     }
 }
 fetchWeather();
-setInterval(fetchWeather, 3600000); // Update hourly
+setInterval(fetchWeather, 3600000); 
 
 // --- FIREBASE INIT ---
 const firebaseConfig = {
@@ -520,11 +534,6 @@ let currentSysState = {};
 let pendingManualType = ""; 
 let pendingManualId = 0;
 let editingSlotKey = null; 
-
-// --- TIMER VARIABLES ---
-let activeRunStartTime = 0;
-let timerInterval = null;
-let currentTrackingState = "STANDBY"; 
 
 // --- BUILD UI GRIDS ---
 for(let i=1; i<=6; i++) {
@@ -608,28 +617,103 @@ function logActivity(message) {
     let newLi = document.createElement('li');
     newLi.innerHTML = `<span class="log-time">${timeStr}</span> ${message}`;
     logList.insertBefore(newLi, logList.firstChild);
-    if(logList.children.length > 50) logList.removeChild(logList.lastChild); // Keep log history longer in pro mode
+    if(logList.children.length > 50) logList.removeChild(logList.lastChild); 
 }
 
-// --- SMART ELAPSED TIMER ---
-function startTimerLogic(newState) {
-    if (currentTrackingState !== newState) {
-        currentTrackingState = newState;
-        activeRunStartTime = Date.now();
-        if(timerInterval) clearInterval(timerInterval);
-        
-        timerInterval = setInterval(() => {
-            let elapsedSecs = Math.floor((Date.now() - activeRunStartTime) / 1000);
-            let m = Math.floor(elapsedSecs / 60).toString().padStart(2, '0');
-            let s = (elapsedSecs % 60).toString().padStart(2, '0');
-            document.getElementById('live-timer').innerText = `${m}:${s}`;
-        }, 1000);
+// --- ADVANCED COUNTDOWN LOGIC ---
+function getScheduledEndTime(type, id) {
+    let now = new Date();
+    let currentDayMask = dayVals[now.getDay()];
+    let currentMs = now.getTime();
+
+    for (let s = 0; s < 3; s++) {
+        let sched = localSchedules['slot_' + s];
+        if (!sched || !sched.active || !(sched.days & currentDayMask)) continue;
+
+        let schedStart = new Date(now);
+        schedStart.setHours(sched.hour, sched.minute, 0, 0);
+        let currentEpoch = schedStart.getTime();
+
+        for (let z = 0; z < 6; z++) {
+            if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
+            let zoneStart = currentEpoch;
+            let zoneEnd = zoneStart + (sched.zones[z].waterMins * 60000);
+            
+            if (type === "irr" && id === (z + 1) && currentMs >= zoneStart && currentMs <= zoneEnd) return zoneEnd;
+
+            let currentFertEpoch = zoneStart;
+            if (sched.zones[z].ferts) {
+                for (let f = 0; f < sched.zones[z].ferts.length; f++) {
+                    let fert = sched.zones[z].ferts[f];
+                    if ((fert.days & currentDayMask) && fert.mins > 0 && fert.comp > 0) {
+                        let fertEnd = currentFertEpoch + (fert.mins * 60000);
+                        if (fertEnd > zoneEnd) fertEnd = zoneEnd; 
+                        
+                        if (type === "fert" && id === fert.comp && currentMs >= currentFertEpoch && currentMs <= fertEnd) return fertEnd;
+                        currentFertEpoch = fertEnd;
+                    }
+                }
+            }
+            currentEpoch = zoneEnd;
+        }
     }
+    return null;
 }
-function stopTimerLogic() {
-    currentTrackingState = "STANDBY";
-    if(timerInterval) clearInterval(timerInterval);
-    document.getElementById('live-timer').innerText = "00:00";
+
+setInterval(() => {
+    if (!currentSysState) return;
+
+    let irrEnd = null;
+    let fertEnd = null;
+    let bwEnd = null;
+
+    // Resolve Irrigation End Time
+    if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
+        irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
+    } else if (currentSysState.activeIrrZone > 0) {
+        irrEnd = getScheduledEndTime("irr", currentSysState.activeIrrZone);
+    }
+
+    // Resolve Fertilizer End Time
+    if (currentSysState.manualFertZone > 0 && currentSysState.manualFertStartTS) {
+        fertEnd = currentSysState.manualFertStartTS + (currentSysState.manualFertMins * 60000);
+    } else if (currentSysState.activeFertZone > 0) {
+        fertEnd = getScheduledEndTime("fert", currentSysState.activeFertZone);
+    }
+
+    // Process UI Updates
+    updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrMins);
+    updateCountdownUI('timer-box-fert', 'timer-label-fert', 'live-timer-fert', fertEnd, currentSysState.activeFertZone, "COMP", currentSysState.manualFertMins);
+}, 1000);
+
+function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualMinsCheck) {
+    let box = document.getElementById(boxId);
+    let label = document.getElementById(labelId);
+    let timer = document.getElementById(timerId);
+    
+    if (activeId > 0 && (endTime || manualMinsCheck === 0)) {
+        box.style.display = "flex";
+        
+        // Handle manual continuous run (0 mins)
+        if ((prefix === "ZONE" && currentSysState.manualIrrZone > 0 && manualMinsCheck === 0) || 
+            (prefix === "COMP" && currentSysState.manualFertZone > 0 && manualMinsCheck === 0)) {
+            label.innerText = `${prefix} ${activeId} ACTIVE`;
+            timer.innerText = "CONT.";
+            timer.style.fontSize = "22px";
+            timer.style.lineHeight = "38px";
+        } else if (endTime) {
+            let rem = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+            let m = Math.floor(rem / 60).toString().padStart(2, '0');
+            let s = (rem % 60).toString().padStart(2, '0');
+            
+            label.innerText = `${prefix} ${activeId} REMAINING`;
+            timer.innerText = `${m}:${s}`;
+            timer.style.fontSize = "32px";
+            timer.style.lineHeight = "normal";
+        }
+    } else {
+        box.style.display = "none";
+    }
 }
 
 // --- SYSTEM SYNC (TELEMETRY) ---
@@ -642,14 +726,12 @@ db.ref('system').on('value', (snap) => {
     let activeIrr = sys.activeIrrZone || 0;
     let activeFert = sys.activeFertZone || 0;
     
-    // 1. UPDATE TELEMETRY HERO
     const hero = document.getElementById('hero-dashboard');
     const heroTitle = document.getElementById('hero-title');
     const heroSub = document.getElementById('hero-subtitle');
     const motorMain = document.getElementById('motor-main-ind');
     const motorFert = document.getElementById('motor-fert-ind');
     
-    // Reset Classes
     hero.className = "telemetry-card";
     motorMain.className = "motor-indicator";
     motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
@@ -664,33 +746,25 @@ db.ref('system').on('value', (snap) => {
         heroTitle.innerText = "BACKWASH ACTIVE";
         heroTitle.style.color = "var(--bw-color)";
         heroSub.innerText = "System valves are safely locked.";
-        startTimerLogic("BW");
     } else if (activeIrr > 0 || activeFert > 0) {
         hero.className = "telemetry-card telemetry-active";
-        
         let titleStr = "";
         if (activeIrr > 0) titleStr += `ZONE ${activeIrr} `;
         if (activeFert > 0) titleStr += `| COMPARTMENT ${activeFert}`;
-        
         heroTitle.innerText = titleStr;
         heroTitle.style.color = "var(--text-main)";
         heroSub.innerText = "Live System Telemetry";
-        
-        startTimerLogic(`IRR-${activeIrr}-FERT-${activeFert}`);
     } else {
         heroTitle.innerText = "STANDBY";
         heroTitle.style.color = "var(--text-main)";
         heroSub.innerText = "Awaiting schedule execution.";
-        stopTimerLogic();
     }
 
-    // 2. UPDATE GRID CARDS
     for(let i=1; i<=6; i++) {
         let isON = (activeIrr === i);
         let toggle = document.getElementById(`toggle-irr-${i}`);
         let card = document.getElementById(`card-irr-${i}`);
         let status = document.getElementById(`status-irr-${i}`);
-        
         if(sys.manualIrrZone === i) toggle.checked = true;
         else toggle.checked = false;
         
@@ -704,7 +778,6 @@ db.ref('system').on('value', (snap) => {
         let toggle = document.getElementById(`toggle-fert-${i}`);
         let card = document.getElementById(`card-fert-${i}`);
         let status = document.getElementById(`status-fert-${i}`);
-        
         if(sys.manualFertZone === i) toggle.checked = true;
         else toggle.checked = false;
         
@@ -713,12 +786,10 @@ db.ref('system').on('value', (snap) => {
         toggle.disabled = isBw;
     }
 
-    // Logging changes
     if(sys.manualIrrZone !== lastState.irr && sys.manualIrrZone > 0) logActivity(`[CMD] Manual Water: Zone ${sys.manualIrrZone} Triggered`);
     if(sys.manualFertZone !== lastState.fert && sys.manualFertZone > 0) logActivity(`[CMD] Manual Fert: Compartment ${sys.manualFertZone} Triggered`);
     lastState.irr = sys.manualIrrZone; lastState.fert = sys.manualFertZone;
 
-    // Heartbeat
     let diff = Math.floor(Date.now()/1000) - (sys.heartbeat || 0);
     let hb = document.getElementById('heartbeat-display');
     if(diff < 15) { 
@@ -736,7 +807,6 @@ db.ref('schedules').on('value', (snap) => {
     let data = snap.val() || {};
     localSchedules = data;
 
-    // Backwash
     if (data.backwash) {
         localBwConfig = data.backwash;
         document.getElementById('bw-master-toggle').checked = localBwConfig.active;
@@ -752,7 +822,6 @@ db.ref('schedules').on('value', (snap) => {
         `;
     }
 
-    // Normal Schedules
     const listDiv = document.getElementById('active-schedules-list');
     listDiv.innerHTML = "";
     let hasSchedules = false;
@@ -791,7 +860,6 @@ db.ref('schedules').on('value', (snap) => {
     if (!hasSchedules) listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px; font-weight:600;">No schedules configured.</p>`;
 });
 
-
 // --- MANUAL OVERRIDES ---
 function handleManualIrr(zoneNum, isChecked) { 
     if(currentSysState.isBackwashActive) return; 
@@ -822,8 +890,13 @@ function handleManualFert(compNum, isChecked) {
 function cancelManualTimer() { document.getElementById('manualTimerOverlay').style.display = "none"; }
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
-    if (pendingManualType === "irr") db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins });
-    else if (pendingManualType === "fert") db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins });
+    
+    // Inject custom start timestamp for precise UI tracking
+    if (pendingManualType === "irr") {
+        db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, manualIrrStartTS: Date.now() });
+    } else if (pendingManualType === "fert") {
+        db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins, manualFertStartTS: Date.now() });
+    }
     cancelManualTimer();
 }
 

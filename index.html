@@ -112,6 +112,7 @@ body {
 .telemetry-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--card-border); transition: 0.3s; }
 .telemetry-active::before { background: var(--primary); box-shadow: 0 0 15px var(--primary); }
 .telemetry-bw::before { background: var(--bw-color); box-shadow: 0 0 15px var(--bw-color); }
+.telemetry-error::before { background: var(--danger); box-shadow: 0 0 15px var(--danger); }
 
 .telemetry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;}
 .telemetry-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin: 0; }
@@ -134,7 +135,7 @@ body {
 .motor-on.m-main i { color: var(--primary); text-shadow: 0 0 10px var(--primary-glow); }
 .motor-on.m-fert i { color: var(--fert-color); text-shadow: 0 0 10px var(--fert-glow); }
 
-/* --- NEW: AC POWER CONSOLE --- */
+/* --- AC POWER CONSOLE --- */
 .power-status-grid {
     display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; 
     margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;
@@ -189,6 +190,7 @@ body {
 input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider.fert-slider { background-color: var(--fert-color); }
 input:checked + .slider.bw-slider { background-color: var(--bw-color); }
+input:checked + .slider.warn-slider { background-color: var(--warning); }
 input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 
@@ -207,7 +209,6 @@ input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 .close-btn { background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; color: var(--text-main); }
 
 .schedule-card { background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--card-border); border-left: 4px solid var(--primary); }
-.schedule-card.bw-card { border-left-color: var(--bw-color); }
 .schedule-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;}
 .schedule-info h4 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-weight: 700;}
 .schedule-info p { margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 4px; }
@@ -241,7 +242,7 @@ input:focus { border-color: var(--primary); outline: none; }
 .fert-row select { padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); color: var(--text-main); border: 1px solid var(--card-border); margin-right: 10px; font-size: 14px; font-weight: 600;}
 .btn-add-fert { background: transparent; color: var(--primary); border: 1px dashed var(--primary); padding: 12px; width: 100%; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: 0.2s;}
 
-/* Mini Modal Overlay */
+/* Overlays */
 .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; backdrop-filter: blur(5px); }
 .mini-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card-bg); border: 1px solid var(--card-border); width: 90%; max-width: 340px; padding: 25px; border-radius: 16px; box-shadow: var(--shadow); }
 .mini-modal h3 { margin-top: 0; font-size: 18px; font-weight: 800; color: var(--text-main); text-align: center;}
@@ -251,6 +252,11 @@ input:focus { border-color: var(--primary); outline: none; }
 .mini-modal-btns button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
 .btn-cancel { background: var(--card-border); color: var(--text-main); }
 .btn-confirm { background: var(--primary); color: white; }
+
+/* Critical Trip Alert Overlay */
+#criticalAlertOverlay .mini-modal { border: 2px solid var(--danger); box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
+#criticalAlertOverlay h3 { color: var(--danger); }
+#criticalAlertOverlay .btn-confirm { background: var(--danger); }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
@@ -356,15 +362,46 @@ input:focus { border-color: var(--primary); outline: none; }
 
     <div class="bottom-bar">
         <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-solid fa-sliders"></i> AUTOMATIONS</button>
-        <button class="btn-schedule btn-danger" onclick="emergencyStop()" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
+        <button class="btn-schedule btn-danger" onclick="emergencyStop(0)" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
     </div>
 
     <div class="modal" id="scheduleHubModal">
         <div class="modal-header">
-            <h2>Automations</h2>
+            <h2>Automations & Config</h2>
             <button class="close-btn" onclick="closeScheduleHub()">Done</button>
         </div>
         <div class="container">
+            
+            <div class="setup-card" style="border: 1px solid var(--warning);">
+                <h3 style="color: var(--warning); border-bottom-color: var(--card-border);"><i class="fa-solid fa-shield-halved"></i> Motor Protection Limits</h3>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <span style="font-size:14px; color:var(--text-main); font-weight:700;">Enable Hardware Protection</span>
+                    <label class="switch"><input type="checkbox" id="prot-toggle"><span class="slider warn-slider"></span></label>
+                </div>
+                
+                <div class="input-group">
+                    <span style="font-size:13px; font-weight:600;">Voltage Limits (V)</span>
+                    <div style="display:flex; align-items:center;">
+                        <input type="number" id="prot-min-v" placeholder="Min" style="width:70px; padding:6px; font-size:14px; text-align:center;">
+                        <span style="margin: 0 8px; color:var(--text-muted);">-</span>
+                        <input type="number" id="prot-max-v" placeholder="Max" style="width:70px; padding:6px; font-size:14px; text-align:center;">
+                    </div>
+                </div>
+                
+                <div class="input-group" style="margin-bottom: 0;">
+                    <span style="font-size:13px; font-weight:600;">Current Limits (A)</span>
+                    <div style="display:flex; align-items:center;">
+                        <input type="number" id="prot-min-a" step="0.1" placeholder="Dry" title="Minimum Amps (Dry Run)" style="width:70px; padding:6px; font-size:14px; text-align:center;">
+                        <span style="margin: 0 8px; color:var(--text-muted);">-</span>
+                        <input type="number" id="prot-max-a" step="0.1" placeholder="Over" title="Maximum Amps (Overload)" style="width:70px; padding:6px; font-size:14px; text-align:center;">
+                    </div>
+                </div>
+                <p style="font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.4;">*Current protection ignores the first 5 seconds of motor startup to prevent false trips from inrush current.</p>
+
+                <button style="width:100%; margin-top:15px; padding:12px; background:rgba(245, 158, 11, 0.1); color:var(--warning); border:1px solid rgba(245, 158, 11, 0.3); border-radius:8px; font-weight:700; cursor:pointer;" onclick="saveProtectionLimits()"><i class="fa-solid fa-floppy-disk"></i> Save Limits</button>
+            </div>
+
             <div class="setup-card" style="border: 1px solid var(--bw-color);">
                 <h3 style="color: var(--bw-color); border-bottom-color: var(--card-border);"><i class="fa-solid fa-filter"></i> Auto Backwash</h3>
                 <div id="bw-schedule-display"></div>
@@ -374,6 +411,7 @@ input:focus { border-color: var(--primary); outline: none; }
                 </div>
                 <button style="width:100%; margin-top:20px; padding:12px; background:rgba(168, 85, 247, 0.1); color:var(--bw-color); border:1px solid rgba(168, 85, 247, 0.3); border-radius:8px; font-weight:700; cursor:pointer;" onclick="openBwEditor()"><i class="fa-solid fa-pen"></i> Edit Settings</button>
             </div>
+
             <h3 style="margin-top: 35px; font-size: 14px; font-weight: 700; color:var(--text-muted); text-transform:uppercase;">Watering Schedules</h3>
             <div id="active-schedules-list">
                 <p style="text-align:center; color:var(--text-muted); margin-top:20px; font-family:var(--font-mono);"><i class="fa-solid fa-spinner fa-spin"></i> Loading data...</p>
@@ -442,6 +480,17 @@ input:focus { border-color: var(--primary); outline: none; }
         </div>
     </div>
 
+    <div class="overlay" id="criticalAlertOverlay">
+        <div class="mini-modal">
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> EMERGENCY TRIP</h3>
+            <p id="criticalAlertDesc" style="font-weight:600; font-size:14px; margin-top:10px;">The system was halted manually.</p>
+            <p style="font-size:11px; color:var(--text-muted); margin-bottom:25px;">All pumps and valves have been safely locked. Please inspect the hardware before resetting.</p>
+            <div class="mini-modal-btns">
+                <button class="btn-confirm" onclick="clearEmergencyStop()" style="width:100%;"><i class="fa-solid fa-rotate-right"></i> Acknowledge & Reset</button>
+            </div>
+        </div>
+    </div>
+
     <div class="overlay" id="locationModalOverlay">
         <div class="mini-modal">
             <h3>Set Weather Location</h3>
@@ -466,7 +515,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
 
-// --- AUTHENTICATION LOGIC ---
 const loginScreen = document.getElementById('login-screen');
 const mainApp = document.getElementById('main-app');
 const loginError = document.getElementById('login-error');
@@ -487,129 +535,63 @@ function loginUser() {
     const pass = document.getElementById('login-pass').value.trim();
     loginError.style.display = 'none';
     
-    if(!email || !pass) {
-        loginError.innerText = "Please enter email and password.";
-        loginError.style.display = 'block';
-        return;
-    }
-    
+    if(!email || !pass) { loginError.innerText = "Please enter email and password."; loginError.style.display = 'block'; return; }
     auth.signInWithEmailAndPassword(email, pass).catch((error) => {
-        loginError.innerText = "Invalid credentials. Please check your Firebase setup.";
-        loginError.style.display = 'block';
-        console.error("Auth Error:", error);
+        loginError.innerText = "Invalid credentials. Please check your Firebase setup."; loginError.style.display = 'block';
     });
 }
-
-function logoutUser() {
-    auth.signOut();
-}
+function logoutUser() { auth.signOut(); }
 
 // --- CLOCK & WEATHER ---
-function updateClock() {
-    const now = new Date();
-    document.getElementById('sys-clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-}
-setInterval(updateClock, 1000);
-updateClock();
+function updateClock() { document.getElementById('sys-clock').innerText = new Date().toLocaleTimeString('en-US', { hour12: false }); }
+setInterval(updateClock, 1000); updateClock();
 
 let weatherLat = localStorage.getItem('weatherLat') || 10.76;
 let weatherLon = localStorage.getItem('weatherLon') || 76.32;
 let weatherCity = localStorage.getItem('weatherCity') || "Chunangad, Kerala";
 
-function openLocationModal() {
-    document.getElementById('cityInput').value = weatherCity;
-    document.getElementById('locationModalOverlay').style.display = 'block';
-}
+function openLocationModal() { document.getElementById('cityInput').value = weatherCity; document.getElementById('locationModalOverlay').style.display = 'block'; }
 
 async function saveLocation() {
-    const city = document.getElementById('cityInput').value.trim();
-    if(!city) return;
-    
-    document.getElementById('weather-desc').innerText = "Locating...";
-    document.getElementById('locationModalOverlay').style.display = 'none';
-    
+    const city = document.getElementById('cityInput').value.trim(); if(!city) return;
+    document.getElementById('weather-desc').innerText = "Locating..."; document.getElementById('locationModalOverlay').style.display = 'none';
     try {
         const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
         const data = await res.json();
-        
         if(data.results && data.results.length > 0) {
-            weatherLat = data.results[0].latitude;
-            weatherLon = data.results[0].longitude;
+            weatherLat = data.results[0].latitude; weatherLon = data.results[0].longitude;
             weatherCity = data.results[0].name + (data.results[0].country ? `, ${data.results[0].country}` : "");
-            
-            localStorage.setItem('weatherLat', weatherLat);
-            localStorage.setItem('weatherLon', weatherLon);
-            localStorage.setItem('weatherCity', weatherCity);
-            
+            localStorage.setItem('weatherLat', weatherLat); localStorage.setItem('weatherLon', weatherLon); localStorage.setItem('weatherCity', weatherCity);
             fetchWeather();
-        } else {
-            alert("City not found. Please try again.");
-            document.getElementById('weather-desc').innerText = "Location Error";
-        }
-    } catch(e) {
-        alert("Error finding location.");
-        document.getElementById('weather-desc').innerText = "Network Error";
-    }
+        } else { alert("City not found."); document.getElementById('weather-desc').innerText = "Location Error"; }
+    } catch(e) { alert("Error finding location."); document.getElementById('weather-desc').innerText = "Network Error"; }
 }
 
 async function fetchWeather() {
     try {
         document.getElementById('loc-name').innerText = weatherCity;
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLat}&longitude=${weatherLon}&current_weather=true`);
-        const data = await res.json();
-        const w = data.current_weather;
+        const data = await res.json(); const w = data.current_weather;
         document.getElementById('weather-temp').innerText = `${Math.round(w.temperature)}°C`;
         document.getElementById('weather-desc').innerText = `Wind: ${w.windspeed} km/h`;
-        
         let icon = "fa-cloud";
-        if(w.weathercode === 0) icon = "fa-sun";
-        else if(w.weathercode > 0 && w.weathercode < 4) icon = "fa-cloud-sun";
-        else if(w.weathercode >= 61 && w.weathercode <= 67) icon = "fa-cloud-rain";
-        else if(w.weathercode >= 95) icon = "fa-cloud-bolt";
-        
+        if(w.weathercode === 0) icon = "fa-sun"; else if(w.weathercode < 4) icon = "fa-cloud-sun"; else if(w.weathercode <= 67) icon = "fa-cloud-rain"; else if(w.weathercode >= 95) icon = "fa-cloud-bolt";
         document.getElementById('weather-icon').className = `fa-solid ${icon} weather-icon`;
-    } catch (e) {
-        document.getElementById('weather-desc').innerText = "Data unavailable";
-    }
+    } catch (e) { document.getElementById('weather-desc').innerText = "Data unavailable"; }
 }
-fetchWeather();
-setInterval(fetchWeather, 3600000); 
+fetchWeather(); setInterval(fetchWeather, 3600000); 
 
-// --- APP LOGIC (Variables & UI Building) ---
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const dayVals = [1, 2, 4, 8, 16, 32, 64];
-
-let localSchedules = {};
-let localBwConfig = { active: false, hour: 0, minute: 0, durationMins: 5, days: 0 };
-let currentSysState = {}; 
-
-let pendingManualType = ""; 
-let pendingManualId = 0;
-let editingSlotKey = null; 
+// --- APP UI LOGIC ---
+const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const dayVals = [1, 2, 4, 8, 16, 32, 64];
+let localSchedules = {}; let localBwConfig = { active: false, hour: 0, minute: 0, durationMins: 5, days: 0 };
+let currentSysState = {}; let pendingManualType = ""; let pendingManualId = 0; let editingSlotKey = null; 
 
 // Build UI Grids
 for(let i=1; i<=6; i++) {
-    document.getElementById('irr-grid').innerHTML += `
-    <div class="control-card" id="card-irr-${i}">
-        <div class="card-header">
-            <i class="fa-solid fa-droplet card-icon"></i>
-            <label class="switch"><input type="checkbox" id="toggle-irr-${i}" onchange="handleManualIrr(${i}, this.checked)"><span class="slider"></span></label>
-        </div>
-        <div class="card-title">Zone ${i}</div>
-        <div class="card-status" id="status-irr-${i}">STANDBY</div>
-    </div>`;
+    document.getElementById('irr-grid').innerHTML += `<div class="control-card" id="card-irr-${i}"><div class="card-header"><i class="fa-solid fa-droplet card-icon"></i><label class="switch"><input type="checkbox" id="toggle-irr-${i}" onchange="handleManualIrr(${i}, this.checked)"><span class="slider"></span></label></div><div class="card-title">Zone ${i}</div><div class="card-status" id="status-irr-${i}">STANDBY</div></div>`;
 }
-
 for(let i=1; i<=4; i++) {
-    document.getElementById('fert-grid').innerHTML += `
-    <div class="control-card" id="card-fert-${i}">
-        <div class="card-header">
-            <i class="fa-solid fa-flask card-icon fert-icon"></i>
-            <label class="switch"><input type="checkbox" id="toggle-fert-${i}" onchange="handleManualFert(${i}, this.checked)"><span class="slider fert-slider"></span></label>
-        </div>
-        <div class="card-title">Compartment ${i}</div>
-        <div class="card-status" id="status-fert-${i}">STANDBY</div>
-    </div>`;
+    document.getElementById('fert-grid').innerHTML += `<div class="control-card" id="card-fert-${i}"><div class="card-header"><i class="fa-solid fa-flask card-icon fert-icon"></i><label class="switch"><input type="checkbox" id="toggle-fert-${i}" onchange="handleManualFert(${i}, this.checked)"><span class="slider fert-slider"></span></label></div><div class="card-title">Compartment ${i}</div><div class="card-status" id="status-fert-${i}">STANDBY</div></div>`;
 }
 
 let mDaysHTML = ''; let bwDaysHTML = '';
@@ -617,160 +599,82 @@ for(let i=0; i<7; i++) {
     mDaysHTML += `<label><input type="checkbox" class="day-checkbox m-day" value="${dayVals[i]}"><span class="day-pill">${dayNames[i]}</span></label>`; 
     bwDaysHTML += `<label><input type="checkbox" class="day-checkbox bw-cb bw-day-val" value="${dayVals[i]}"><span class="day-pill">${dayNames[i]}</span></label>`;
 }
-document.getElementById('master-days').innerHTML = mDaysHTML;
-document.getElementById('bw-days-container').innerHTML = bwDaysHTML;
+document.getElementById('master-days').innerHTML = mDaysHTML; document.getElementById('bw-days-container').innerHTML = bwDaysHTML;
 
 let zConfigHTML = '';
 for(let z=0; z<6; z++) {
-    zConfigHTML += `
-    <div class="zone-setup">
-        <div class="zone-header"><span><i class="fa-solid fa-droplet" style="color:var(--primary)"></i> Zone ${z+1}</span></div>
-        <div class="input-group">
-            <span style="font-weight:600; font-size:14px; color:var(--text-main);">Water Duration</span>
-            <div style="display:flex; align-items:center;"><input type="number" id="z-irrDur-${z}" min="0" value="0"> <span style="font-size:12px; font-weight:600; color:var(--text-muted); margin-left:8px;">mins</span></div>
-        </div>
-        <div class="fert-container" id="fert-container-${z}"></div>
-        <button class="btn-add-fert" onclick="addFertRow(${z})"><i class="fa-solid fa-plus"></i> Add Fertilizer</button>
-    </div>`;
+    zConfigHTML += `<div class="zone-setup"><div class="zone-header"><span><i class="fa-solid fa-droplet" style="color:var(--primary)"></i> Zone ${z+1}</span></div><div class="input-group"><span style="font-weight:600; font-size:14px; color:var(--text-main);">Water Duration</span><div style="display:flex; align-items:center;"><input type="number" id="z-irrDur-${z}" min="0" value="0"> <span style="font-size:12px; font-weight:600; color:var(--text-muted); margin-left:8px;">mins</span></div></div><div class="fert-container" id="fert-container-${z}"></div><button class="btn-add-fert" onclick="addFertRow(${z})"><i class="fa-solid fa-plus"></i> Add Fertilizer</button></div>`;
 }
 document.getElementById('zone-config-container').innerHTML = zConfigHTML;
 
 let fertCounts = [0,0,0,0,0,0];
 function addFertRow(zoneIdx) {
     if(fertCounts[zoneIdx] >= 4) { alert("Max 4 fertilizers allowed."); return; }
-    let rowId = fertCounts[zoneIdx];
-    let fDaysHTML = '';
+    let rowId = fertCounts[zoneIdx]; let fDaysHTML = '';
     for(let d=0; d<7; d++) { fDaysHTML += `<label><input type="checkbox" class="day-checkbox fert-cb f-day-${zoneIdx}-${rowId}" value="${dayVals[d]}"><span class="day-pill">${dayNames[d]}</span></label>`; }
 
-    let html = `
-    <div class="fert-row" id="frow-${zoneIdx}-${rowId}">
-        <button class="remove-fert" onclick="removeFertRow(${zoneIdx}, ${rowId})"><i class="fa-solid fa-xmark"></i></button>
-        <div style="margin-bottom: 12px; display:flex; align-items:center; flex-wrap: wrap; gap: 8px;">
-            <select id="sel-comp-${zoneIdx}-${rowId}">
-                <option value="1">Comp 1</option><option value="2">Comp 2</option>
-                <option value="3">Comp 3</option><option value="4">Comp 4</option>
-            </select>
-            <input type="time" id="sel-time-${zoneIdx}-${rowId}" required style="width: 110px; padding: 8px; font-size: 14px;">
-            <div style="display:flex; align-items:center;">
-                <input type="number" id="sel-mins-${zoneIdx}-${rowId}" min="1" value="5" style="width:65px; padding:8px; text-align:center;">
-                <span style="font-size:12px; font-weight:600; margin-left:6px; color:var(--text-muted);">mins</span>
-            </div>
-        </div>
-        <div style="font-size:12px; font-weight:700; margin-bottom:8px; color:var(--text-muted);">INJECT ON:</div>
-        <div class="day-selector">${fDaysHTML}</div>
-    </div>`;
+    let html = `<div class="fert-row" id="frow-${zoneIdx}-${rowId}"><button class="remove-fert" onclick="removeFertRow(${zoneIdx}, ${rowId})"><i class="fa-solid fa-xmark"></i></button><div style="margin-bottom: 12px; display:flex; align-items:center; flex-wrap: wrap; gap: 8px;"><select id="sel-comp-${zoneIdx}-${rowId}"><option value="1">Comp 1</option><option value="2">Comp 2</option><option value="3">Comp 3</option><option value="4">Comp 4</option></select><input type="time" id="sel-time-${zoneIdx}-${rowId}" required style="width: 110px; padding: 8px; font-size: 14px;"><div style="display:flex; align-items:center;"><input type="number" id="sel-mins-${zoneIdx}-${rowId}" min="1" value="5" style="width:65px; padding:8px; text-align:center;"><span style="font-size:12px; font-weight:600; margin-left:6px; color:var(--text-muted);">mins</span></div></div><div style="font-size:12px; font-weight:700; margin-bottom:8px; color:var(--text-muted);">INJECT ON:</div><div class="day-selector">${fDaysHTML}</div></div>`;
     document.getElementById(`fert-container-${zoneIdx}`).insertAdjacentHTML('beforeend', html);
     fertCounts[zoneIdx]++;
 }
 function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-${zoneIdx}-${rowId}`); if(el) el.remove(); }
 
-function logActivity(message) { console.log("[SIP-CONSOLE]: " + message); }
-
-// --- DATABASE LISTENERS (Called ONLY when Logged In) ---
+// --- DATABASE LISTENERS ---
 function initAppListeners() {
     
-    function getScheduledEndTime(id) {
-        let now = new Date(); let currentDayMask = dayVals[now.getDay()]; let currentMs = now.getTime(); let buffer = 180000; 
-        for (let s = 0; s < 3; s++) {
-            let sched = localSchedules['slot_' + s];
-            if (!sched || !sched.active || !(sched.days & currentDayMask)) continue;
-            let schedStart = new Date(now); schedStart.setHours(sched.hour, sched.minute, 0, 0);
-            let currentEpoch = schedStart.getTime();
-            for (let z = 0; z < 6; z++) {
-                if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
-                let zoneEnd = currentEpoch + (sched.zones[z].waterMins * 60000);
-                if (id === (z + 1) && currentMs >= (currentEpoch - buffer) && currentMs <= (zoneEnd + buffer)) return zoneEnd;
-                currentEpoch = zoneEnd;
-            }
-        }
-        return null;
-    }
-
-    function getBwEndTime() {
-        if (!localBwConfig || !localBwConfig.active) return null;
-        let now = new Date(); let currentDayMask = dayVals[now.getDay()];
-        if (!(localBwConfig.days & currentDayMask)) return null;
-        let schedStart = new Date(now); schedStart.setHours(localBwConfig.hour, localBwConfig.minute, 0, 0);
-        let endMs = schedStart.getTime() + (localBwConfig.durationMins * 60000);
-        if (now.getTime() >= (schedStart.getTime() - 180000) && now.getTime() <= (endMs + 180000)) return endMs;
-        return null;
-    }
-
-    setInterval(() => {
-        if (!currentSysState) return;
-        let irrEnd = null; let bwEnd = null;
-
-        if (currentSysState.isBackwashActive) {
-            bwEnd = getBwEndTime();
+    // --- EMERGENCY STOP LISTENER ---
+    db.ref('system/emergencyStop').on('value', (snap) => {
+        if (snap.val() === true) {
+            db.ref('system/lastTripReason').once('value').then((res) => {
+                let code = res.val() || 0; let desc = "Manual Emergency Stop Activated.";
+                if(code === 1) desc = "FAULT: Voltage Out of Bounds. Check Grid Power.";
+                if(code === 2) desc = "FAULT: Dry Run Detected (Undercurrent). Check source water.";
+                if(code === 3) desc = "FAULT: Motor Overload Detected (Overcurrent). Check pump.";
+                
+                document.getElementById('criticalAlertDesc').innerText = desc;
+                document.getElementById('criticalAlertOverlay').style.display = 'block';
+                document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error";
+                document.getElementById('hero-title').innerText = "SYSTEM HALTED";
+                document.getElementById('hero-title').style.color = "var(--danger)";
+            });
         } else {
-            if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
-                irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
-            } else if (currentSysState.activeIrrZone > 0) {
-                irrEnd = getScheduledEndTime(currentSysState.activeIrrZone);
-            }
+            document.getElementById('criticalAlertOverlay').style.display = 'none';
         }
+    });
 
-        updateCountdownUI('timer-box-irr', 'timer-label-irr', 'live-timer-irr', irrEnd, currentSysState.activeIrrZone, "ZONE", currentSysState.manualIrrZone, currentSysState.manualIrrMins);
-        let bwActiveFlag = currentSysState.isBackwashActive ? 1 : 0;
-        updateCountdownUI('timer-box-bw', 'timer-label-bw', 'live-timer-bw', bwEnd, bwActiveFlag, "BACKWASH", 0, 1);
-    }, 1000);
-
-    function updateCountdownUI(boxId, labelId, timerId, endTime, activeId, prefix, manualZoneFlag, manualMinsCheck) {
-        let box = document.getElementById(boxId); let label = document.getElementById(labelId); let timer = document.getElementById(timerId);
-        if (activeId > 0) {
-            box.style.display = "flex";
-            let labelText = prefix === "BACKWASH" ? "FLUSH REMAINING" : `${prefix} ${activeId} REMAINING`;
-            let activeText = prefix === "BACKWASH" ? "BACKWASH ACTIVE" : `${prefix} ${activeId} ACTIVE`;
-
-            if (manualZoneFlag > 0 && manualMinsCheck === 0) {
-                label.innerText = activeText; timer.innerText = "CONT.";
-                timer.style.fontSize = "22px"; timer.style.lineHeight = "38px";
-            } else if (endTime) {
-                let rem = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-                timer.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
-                label.innerText = labelText; timer.style.fontSize = "32px"; timer.style.lineHeight = "normal";
-            } else {
-                label.innerText = activeText; timer.innerText = "--:--";
-                timer.style.fontSize = "32px"; timer.style.lineHeight = "normal";
-            }
-        } else {
-            box.style.display = "none";
-        }
-    }
+    db.ref('system/motorConfig').on('value', (snap) => {
+        let conf = snap.val() || {};
+        document.getElementById('prot-toggle').checked = conf.enabled || false;
+        if(conf.minV) document.getElementById('prot-min-v').value = conf.minV;
+        if(conf.maxV) document.getElementById('prot-max-v').value = conf.maxV;
+        if(conf.minA) document.getElementById('prot-min-a').value = conf.minA;
+        if(conf.maxA) document.getElementById('prot-max-a').value = conf.maxA;
+    });
 
     db.ref('system').on('value', (snap) => {
         const sys = snap.val() || {}; currentSysState = sys;
+        if (sys.emergencyStop) return; // Freeze UI if tripped
+
         let isBw = sys.isBackwashActive === true; let activeIrr = sys.activeIrrZone || 0; let activeFert = sys.activeFertZone || 0;
-        
         const hero = document.getElementById('hero-dashboard');
-        const motorMain = document.getElementById('motor-main-ind'); const motorFert = document.getElementById('motor-fert-ind');
         
-        hero.className = "telemetry-card";
-        motorMain.className = "motor-indicator"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
-        motorFert.className = "motor-indicator"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
+        document.getElementById('motor-main-ind').className = sys.pump1Active ? "motor-indicator motor-on m-main" : "motor-indicator";
+        document.getElementById('motor-main-ind').innerHTML = sys.pump1Active ? `<i class="fa-solid fa-water"></i> Main Pump: ON` : `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
         
-        if (sys.pump1Active) { motorMain.className = "motor-indicator motor-on m-main"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: ON`; }
-        if (sys.fertPumpActive) { motorFert.className = "motor-indicator motor-on m-fert"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: ON`; }
+        document.getElementById('motor-fert-ind').className = sys.fertPumpActive ? "motor-indicator motor-on m-fert" : "motor-indicator";
+        document.getElementById('motor-fert-ind').innerHTML = sys.fertPumpActive ? `<i class="fa-solid fa-flask"></i> Fert Pump: ON` : `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
 
-        // --- NEW: Update PZEM Power UI ---
-        let voltUI = document.getElementById('pzem-volt');
-        let currUI = document.getElementById('pzem-curr');
-        let powUI  = document.getElementById('pzem-pow');
-
+        // UPDATE PZEM UI
+        let voltUI = document.getElementById('pzem-volt'); let currUI = document.getElementById('pzem-curr'); let powUI  = document.getElementById('pzem-pow');
         if(sys.voltage === undefined || sys.voltage < 0) {
-            voltUI.innerHTML = `<span class="power-error">OFFLINE</span>`;
-            currUI.innerHTML = `-- A`;
-            powUI.innerHTML  = `-- W`;
+            voltUI.innerHTML = `<span class="power-error">OFFLINE</span>`; currUI.innerHTML = `-- A`; powUI.innerHTML  = `-- W`;
         } else {
             voltUI.innerText = `${parseFloat(sys.voltage).toFixed(1)} V`;
             currUI.innerText = `${parseFloat(sys.current).toFixed(2)} A`;
             powUI.innerText  = `${parseFloat(sys.power).toFixed(0)} W`;
-            
-            // Optional warning style for low voltage before pumping
-            if (sys.voltage < 190 && !sys.pump1Active) {
-                voltUI.style.color = "var(--danger)";
-            } else {
-                voltUI.style.color = "var(--text-main)";
+            if (sys.motorConfig && sys.motorConfig.enabled) {
+                if (sys.voltage < sys.motorConfig.minV || sys.voltage > sys.motorConfig.maxV) voltUI.style.color = "var(--danger)";
+                else voltUI.style.color = "var(--text-main)";
             }
         }
 
@@ -780,30 +684,26 @@ function initAppListeners() {
             document.getElementById('hero-subtitle').innerText = "System valves are safely locked.";
         } else if (activeIrr > 0 || activeFert > 0) {
             hero.className = "telemetry-card telemetry-active";
-            let titleStr = "";
-            if (activeIrr > 0) titleStr += `ZONE ${activeIrr} `;
-            if (activeFert > 0) titleStr += `| COMPARTMENT ${activeFert}`;
-            document.getElementById('hero-title').innerText = titleStr; document.getElementById('hero-title').style.color = "var(--text-main)";
+            document.getElementById('hero-title').innerText = (activeIrr > 0 ? `ZONE ${activeIrr} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); 
+            document.getElementById('hero-title').style.color = "var(--text-main)";
             document.getElementById('hero-subtitle').innerText = "Live System Telemetry";
         } else {
+            hero.className = "telemetry-card";
             document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)";
             document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution.";
         }
 
         for(let i=1; i<=6; i++) {
-            let isON = (activeIrr === i); let toggle = document.getElementById(`toggle-irr-${i}`);
-            if(sys.manualIrrZone === i) toggle.checked = true; else toggle.checked = false;
-            document.getElementById(`card-irr-${i}`).className = isON ? "control-card active-irr" : "control-card";
-            document.getElementById(`status-irr-${i}`).innerText = isON ? "FLOW ACTIVE" : "STANDBY";
-            toggle.disabled = isBw;
+            let toggle = document.getElementById(`toggle-irr-${i}`);
+            toggle.checked = (sys.manualIrrZone === i); toggle.disabled = isBw;
+            document.getElementById(`card-irr-${i}`).className = (activeIrr === i) ? "control-card active-irr" : "control-card";
+            document.getElementById(`status-irr-${i}`).innerText = (activeIrr === i) ? "FLOW ACTIVE" : "STANDBY";
         }
-        
         for(let i=1; i<=4; i++) {
-            let isON = (activeFert === i); let toggle = document.getElementById(`toggle-fert-${i}`);
-            if(sys.manualFertZone === i) toggle.checked = true; else toggle.checked = false;
-            document.getElementById(`card-fert-${i}`).className = isON ? "control-card active-fert" : "control-card";
-            document.getElementById(`status-fert-${i}`).innerText = isON ? "INJECTING" : "STANDBY";
-            toggle.disabled = isBw;
+            let toggle = document.getElementById(`toggle-fert-${i}`);
+            toggle.checked = (sys.manualFertZone === i); toggle.disabled = isBw;
+            document.getElementById(`card-fert-${i}`).className = (activeFert === i) ? "control-card active-fert" : "control-card";
+            document.getElementById(`status-fert-${i}`).innerText = (activeFert === i) ? "INJECTING" : "STANDBY";
         }
 
         let hb = document.getElementById('heartbeat-display');
@@ -821,12 +721,7 @@ function initAppListeners() {
             document.getElementById('bw-master-toggle').checked = localBwConfig.active;
             let hh = String(localBwConfig.hour).padStart(2, '0'); let mm = String(localBwConfig.minute).padStart(2, '0');
             let bwDays = []; for(let i=0; i<7; i++) { if((localBwConfig.days & dayVals[i]) !== 0) bwDays.push(dayNames[i]); }
-            let dText = bwDays.length === 7 ? "Everyday" : (bwDays.length === 0 ? "No Days" : bwDays.join(", "));
-            
-            document.getElementById('bw-schedule-display').innerHTML = `
-                <p style="font-size:14px; margin:5px 0; font-family:var(--font-mono); color:var(--text-main);"><strong>EXEC TIME:</strong> ${hh}:${mm} <span style="color:var(--text-muted);">(${localBwConfig.durationMins}m)</span></p>
-                <p style="font-size:13px; margin:5px 0; color:var(--text-muted);"><strong>DAYS:</strong> ${dText}</p>
-            `;
+            document.getElementById('bw-schedule-display').innerHTML = `<p style="font-size:14px; margin:5px 0; font-family:var(--font-mono); color:var(--text-main);"><strong>EXEC TIME:</strong> ${hh}:${mm} <span style="color:var(--text-muted);">(${localBwConfig.durationMins}m)</span></p><p style="font-size:13px; margin:5px 0; color:var(--text-muted);"><strong>DAYS:</strong> ${bwDays.length === 7 ? "Everyday" : (bwDays.length === 0 ? "No Days" : bwDays.join(", "))}</p>`;
         }
 
         const listDiv = document.getElementById('active-schedules-list'); listDiv.innerHTML = ""; let hasSchedules = false;
@@ -835,29 +730,67 @@ function initAppListeners() {
             if (!sched || sched.hour === undefined) continue; hasSchedules = true;
             let hh = String(sched.hour).padStart(2, '0'); let mm = String(sched.minute).padStart(2, '0');
             let activeDays = []; for(let i=0; i<7; i++) { if((sched.days & dayVals[i]) !== 0) activeDays.push(dayNames[i]); }
-            let dText = activeDays.length === 7 ? "Everyday" : activeDays.join(", ");
-
-            listDiv.innerHTML += `
-            <div class="schedule-card">
-                <div class="schedule-header-row">
-                    <div class="schedule-info"><h4><i class="fa-regular fa-clock" style="color:var(--text-muted); font-size:18px;"></i> ${hh}:${mm}</h4></div>
-                    <label class="switch"><input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive('${key}', this.checked)"><span class="slider"></span></label>
-                </div>
-                <div class="schedule-info">
-                    <p><strong>DAYS:</strong> ${dText}</p>
-                    <p><strong>STATUS:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:700;">ACTIVE</span>' : '<span style="color:var(--danger);font-weight:700;">INACTIVE</span>'}</p>
-                </div>
-                <div class="action-btns">
-                    <button class="btn-edit" onclick="openScheduleEditor('${key}')"><i class="fa-solid fa-pen"></i> Edit</button>
-                    <button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button>
-                </div>
-            </div>`;
+            listDiv.innerHTML += `<div class="schedule-card"><div class="schedule-header-row"><div class="schedule-info"><h4><i class="fa-regular fa-clock" style="color:var(--text-muted); font-size:18px;"></i> ${hh}:${mm}</h4></div><label class="switch"><input type="checkbox" ${sched.active ? 'checked' : ''} onchange="toggleScheduleActive('${key}', this.checked)"><span class="slider"></span></label></div><div class="schedule-info"><p><strong>DAYS:</strong> ${activeDays.length === 7 ? "Everyday" : activeDays.join(", ")}</p><p><strong>STATUS:</strong> ${sched.active ? '<span style="color:var(--fert-color);font-weight:700;">ACTIVE</span>' : '<span style="color:var(--danger);font-weight:700;">INACTIVE</span>'}</p></div><div class="action-btns"><button class="btn-edit" onclick="openScheduleEditor('${key}')"><i class="fa-solid fa-pen"></i> Edit</button><button class="btn-delete" onclick="deleteSchedule('${key}')"><i class="fa-solid fa-trash"></i> Delete</button></div></div>`;
         }
         if (!hasSchedules) listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px; font-weight:600;">No schedules configured.</p>`;
     });
+
+    setInterval(() => {
+        if (!currentSysState || currentSysState.emergencyStop) return;
+        let irrEnd = null; let bwEnd = null;
+
+        if (currentSysState.isBackwashActive) {
+            if (localBwConfig && localBwConfig.active) {
+                let now = new Date(); if (localBwConfig.days & dayVals[now.getDay()]) {
+                    let start = new Date(now); start.setHours(localBwConfig.hour, localBwConfig.minute, 0, 0);
+                    let end = start.getTime() + (localBwConfig.durationMins * 60000);
+                    if (now.getTime() >= (start.getTime() - 180000) && now.getTime() <= (end + 180000)) bwEnd = end;
+                }
+            }
+        } else {
+            if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
+                irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
+            } else if (currentSysState.activeIrrZone > 0) {
+                let now = new Date(); let currentDayMask = dayVals[now.getDay()]; let currentMs = now.getTime();
+                for (let s = 0; s < 3; s++) {
+                    let sched = localSchedules['slot_' + s];
+                    if (!sched || !sched.active || !(sched.days & currentDayMask)) continue;
+                    let currentEpoch = new Date(now).setHours(sched.hour, sched.minute, 0, 0);
+                    for (let z = 0; z < 6; z++) {
+                        if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
+                        let zoneEnd = currentEpoch + (sched.zones[z].waterMins * 60000);
+                        if (currentSysState.activeIrrZone === (z + 1) && currentMs >= (currentEpoch - 180000) && currentMs <= (zoneEnd + 180000)) irrEnd = zoneEnd;
+                        currentEpoch = zoneEnd;
+                    }
+                }
+            }
+        }
+
+        let boxI = document.getElementById('timer-box-irr'); let lblI = document.getElementById('timer-label-irr'); let tmrI = document.getElementById('live-timer-irr');
+        if (currentSysState.activeIrrZone > 0) {
+            boxI.style.display = "flex";
+            if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrMins === 0) {
+                lblI.innerText = `ZONE ${currentSysState.activeIrrZone} ACTIVE`; tmrI.innerText = "CONT."; tmrI.style.fontSize = "22px"; tmrI.style.lineHeight = "38px";
+            } else if (irrEnd) {
+                let rem = Math.max(0, Math.floor((irrEnd - Date.now()) / 1000));
+                tmrI.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
+                lblI.innerText = `ZONE ${currentSysState.activeIrrZone} REMAINING`; tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
+            } else { lblI.innerText = `ZONE ${currentSysState.activeIrrZone} ACTIVE`; tmrI.innerText = "--:--"; }
+        } else { boxI.style.display = "none"; }
+
+        let boxB = document.getElementById('timer-box-bw'); let lblB = document.getElementById('timer-label-bw'); let tmrB = document.getElementById('live-timer-bw');
+        if (currentSysState.isBackwashActive) {
+            boxB.style.display = "flex";
+            if (bwEnd) {
+                let rem = Math.max(0, Math.floor((bwEnd - Date.now()) / 1000));
+                tmrB.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
+                lblB.innerText = "FLUSH REMAINING"; tmrB.style.fontSize = "32px"; tmrB.style.lineHeight = "normal";
+            } else { lblB.innerText = "BACKWASH ACTIVE"; tmrB.innerText = "--:--"; }
+        } else { boxB.style.display = "none"; }
+    }, 1000);
 }
 
-// --- OVERRIDE & MODAL ACTIONS ---
+// --- OVERRIDE ACTIONS ---
 function handleManualIrr(zoneNum, isChecked) { 
     if(currentSysState.isBackwashActive) return; 
     if (isChecked) {
@@ -892,8 +825,28 @@ function confirmManualTimer() {
     cancelManualTimer();
 }
 
-function emergencyStop() {
-  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES?")) { db.ref('system/emergencyStop').set(true); logActivity("[ALERT] SYSTEM EMERGENCY STOP"); }
+function emergencyStop(reason) {
+  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES?")) { 
+      db.ref('system').update({ emergencyStop: true, lastTripReason: reason }); 
+  }
+}
+
+function clearEmergencyStop() {
+    db.ref('system').update({ emergencyStop: false, lastTripReason: 0 }).then(() => {
+        document.getElementById('criticalAlertOverlay').style.display = 'none';
+        document.getElementById('hero-dashboard').className = "telemetry-card";
+    });
+}
+
+function saveProtectionLimits() {
+    let conf = {
+        enabled: document.getElementById('prot-toggle').checked,
+        minV: parseFloat(document.getElementById('prot-min-v').value) || 190,
+        maxV: parseFloat(document.getElementById('prot-max-v').value) || 250,
+        minA: parseFloat(document.getElementById('prot-min-a').value) || 1.0,
+        maxA: parseFloat(document.getElementById('prot-max-a').value) || 10.0
+    };
+    db.ref('system/motorConfig').set(conf).then(() => { alert("Protection limits saved."); });
 }
 
 function openScheduleHub() { document.getElementById('scheduleHubModal').style.display = 'block'; }
@@ -960,20 +913,12 @@ function saveSchedule() {
             let compEl = document.getElementById(`sel-comp-${z}-${f}`); if(!compEl) continue;
             let timeVal = document.getElementById(`sel-time-${z}-${f}`).value;
             let startH = 0, startM = 0;
-            if (timeVal) {
-                startH = parseInt(timeVal.split(':')[0]);
-                startM = parseInt(timeVal.split(':')[1]);
-            } else {
-                continue; 
-            }
+            if (timeVal) { startH = parseInt(timeVal.split(':')[0]); startM = parseInt(timeVal.split(':')[1]); } else continue; 
 
             let fDaysMask = 0; document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));
             validFerts.push({ 
-                comp: parseInt(compEl.value), 
-                startHour: startH,
-                startMinute: startM,
-                mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0, 
-                days: fDaysMask 
+                comp: parseInt(compEl.value), startHour: startH, startMinute: startM,
+                mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0, days: fDaysMask 
             });
         }
         if(validFerts.length > 0) zoneObj.ferts = validFerts;

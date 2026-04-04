@@ -427,7 +427,9 @@ input:focus { border-color: var(--primary); outline: none; }
         </div>
     </div>
 
-</div> <script>
+</div> 
+
+<script>
 // --- FIREBASE INIT ---
 const firebaseConfig = {
     apiKey: "AIzaSyAbfqRl4T3cv6cjZz9wT9J9cOjOenp-UJY",
@@ -444,12 +446,10 @@ const loginError = document.getElementById('login-error');
 
 auth.onAuthStateChanged((user) => {
     if (user) {
-        // Logged In -> Show App, Hide Login
         loginScreen.style.display = 'none';
         mainApp.style.display = 'block';
-        initAppListeners(); // Start pulling data
+        initAppListeners(); 
     } else {
-        // Logged Out -> Show Login, Hide App
         loginScreen.style.display = 'flex';
         mainApp.style.display = 'none';
     }
@@ -548,7 +548,6 @@ async function fetchWeather() {
 fetchWeather();
 setInterval(fetchWeather, 3600000); 
 
-
 // --- APP LOGIC (Variables & UI Building) ---
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const dayVals = [1, 2, 4, 8, 16, 32, 64];
@@ -619,13 +618,16 @@ function addFertRow(zoneIdx) {
     let html = `
     <div class="fert-row" id="frow-${zoneIdx}-${rowId}">
         <button class="remove-fert" onclick="removeFertRow(${zoneIdx}, ${rowId})"><i class="fa-solid fa-xmark"></i></button>
-        <div style="margin-bottom: 12px; display:flex; align-items:center;">
+        <div style="margin-bottom: 12px; display:flex; align-items:center; flex-wrap: wrap; gap: 8px;">
             <select id="sel-comp-${zoneIdx}-${rowId}">
                 <option value="1">Comp 1</option><option value="2">Comp 2</option>
                 <option value="3">Comp 3</option><option value="4">Comp 4</option>
             </select>
-            <input type="number" id="sel-mins-${zoneIdx}-${rowId}" min="1" value="5" style="width:70px; padding:8px; text-align:center;">
-            <span style="font-size:12px; font-weight:600; margin-left:8px; color:var(--text-muted);">mins</span>
+            <input type="time" id="sel-time-${zoneIdx}-${rowId}" required style="width: 110px; padding: 8px; font-size: 14px;">
+            <div style="display:flex; align-items:center;">
+                <input type="number" id="sel-mins-${zoneIdx}-${rowId}" min="1" value="5" style="width:65px; padding:8px; text-align:center;">
+                <span style="font-size:12px; font-weight:600; margin-left:6px; color:var(--text-muted);">mins</span>
+            </div>
         </div>
         <div style="font-size:12px; font-weight:700; margin-bottom:8px; color:var(--text-muted);">INJECT ON:</div>
         <div class="day-selector">${fDaysHTML}</div>
@@ -885,7 +887,9 @@ function openScheduleEditor(key) {
             if(sched.zones[z].ferts) {
                 sched.zones[z].ferts.forEach((fert) => {
                     addFertRow(z); let rowId = fertCounts[z] - 1; 
-                    document.getElementById(`sel-comp-${z}-${rowId}`).value = fert.comp; document.getElementById(`sel-mins-${z}-${rowId}`).value = fert.mins;
+                    document.getElementById(`sel-comp-${z}-${rowId}`).value = fert.comp;
+                    document.getElementById(`sel-mins-${z}-${rowId}`).value = fert.mins;
+                    document.getElementById(`sel-time-${z}-${rowId}`).value = `${String(fert.startHour || 0).padStart(2, '0')}:${String(fert.startMinute || 0).padStart(2, '0')}`;
                     document.querySelectorAll(`.f-day-${z}-${rowId}`).forEach(cb => cb.checked = ((fert.days & parseInt(cb.value)) !== 0));
                 });
             }
@@ -905,8 +909,23 @@ function saveSchedule() {
         let validFerts = [];
         for(let f=0; f<fertCounts[z]; f++) {
             let compEl = document.getElementById(`sel-comp-${z}-${f}`); if(!compEl) continue;
+            let timeVal = document.getElementById(`sel-time-${z}-${f}`).value;
+            let startH = 0, startM = 0;
+            if (timeVal) {
+                startH = parseInt(timeVal.split(':')[0]);
+                startM = parseInt(timeVal.split(':')[1]);
+            } else {
+                continue; // Prevent saving if time isn't selected
+            }
+
             let fDaysMask = 0; document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));
-            validFerts.push({ comp: parseInt(compEl.value), mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0, days: fDaysMask });
+            validFerts.push({ 
+                comp: parseInt(compEl.value), 
+                startHour: startH,
+                startMinute: startM,
+                mins: parseInt(document.getElementById(`sel-mins-${z}-${f}`).value) || 0, 
+                days: fDaysMask 
+            });
         }
         if(validFerts.length > 0) zoneObj.ferts = validFerts;
         sData.zones.push(zoneObj);

@@ -95,12 +95,7 @@ body {
 .container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
 
 /* --- TOP DASHBOARD GRID --- */
-.top-dashboard {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-    margin-bottom: 30px;
-}
+.top-dashboard { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px; }
 @media (max-width: 768px) { .top-dashboard { grid-template-columns: 1fr; } }
 
 /* Telemetry Card (Hero) */
@@ -113,6 +108,7 @@ body {
 .telemetry-active::before { background: var(--primary); box-shadow: 0 0 15px var(--primary); }
 .telemetry-bw::before { background: var(--bw-color); box-shadow: 0 0 15px var(--bw-color); }
 .telemetry-error::before { background: var(--danger); box-shadow: 0 0 15px var(--danger); }
+.telemetry-paused::before { background: var(--warning); box-shadow: 0 0 15px var(--warning); }
 
 .telemetry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;}
 .telemetry-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin: 0; }
@@ -124,9 +120,9 @@ body {
 .timer-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
 .live-timer { font-family: var(--font-mono); font-size: 32px; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
 
-.telemetry-active .timers-container, .telemetry-bw .timers-container { display: flex; }
-.telemetry-active .timer-label, .telemetry-bw .timer-label { color: rgba(255,255,255,0.7); }
-.telemetry-active .live-timer, .telemetry-bw .live-timer { color: #ffffff; }
+.telemetry-active .timers-container, .telemetry-bw .timers-container, .telemetry-paused .timers-container { display: flex; }
+.telemetry-active .timer-label, .telemetry-bw .timer-label, .telemetry-paused .timer-label { color: rgba(255,255,255,0.7); }
+.telemetry-active .live-timer, .telemetry-bw .live-timer, .telemetry-paused .live-timer { color: #ffffff; }
 
 .motor-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; border-top: 1px solid var(--card-border); padding-top: 20px;}
 .motor-indicator { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
@@ -144,6 +140,7 @@ body {
 .power-label { font-size: 10px; color: var(--text-muted); font-weight: 800; letter-spacing: 1px; margin-bottom: 5px;}
 .power-val { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--text-main); }
 .power-error { color: var(--danger); font-size: 14px; }
+.power-warn { color: var(--warning); font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
 
 /* Weather Card */
 .weather-card {
@@ -209,6 +206,7 @@ input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 .close-btn { background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; color: var(--text-main); }
 
 .schedule-card { background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--card-border); border-left: 4px solid var(--primary); }
+.schedule-card.bw-card { border-left-color: var(--bw-color); }
 .schedule-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;}
 .schedule-info h4 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-weight: 700;}
 .schedule-info p { margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 4px; }
@@ -253,10 +251,13 @@ input:focus { border-color: var(--primary); outline: none; }
 .btn-cancel { background: var(--card-border); color: var(--text-main); }
 .btn-confirm { background: var(--primary); color: white; }
 
-/* Critical Trip Alert Overlay */
+/* Alert Overlays */
 #criticalAlertOverlay .mini-modal { border: 2px solid var(--danger); box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
 #criticalAlertOverlay h3 { color: var(--danger); }
 #criticalAlertOverlay .btn-confirm { background: var(--danger); }
+
+#autoRecoveryOverlay .mini-modal { border: 2px solid var(--warning); box-shadow: 0 0 30px rgba(245, 158, 11, 0.4); }
+#autoRecoveryOverlay h3 { color: var(--warning); }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
@@ -338,7 +339,6 @@ input:focus { border-color: var(--primary); outline: none; }
                         <div class="power-val" id="pzem-pow">-- W</div>
                     </div>
                 </div>
-
             </div>
 
             <div class="weather-card">
@@ -361,8 +361,8 @@ input:focus { border-color: var(--primary); outline: none; }
     </div>
 
     <div class="bottom-bar">
-        <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-solid fa-sliders"></i> AUTOMATIONS</button>
-        <button class="btn-schedule btn-danger" onclick="emergencyStop(0)" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
+        <button class="btn-schedule" onclick="openScheduleHub()"><i class="fa-solid fa-sliders"></i> AUTOMATIONS & SETTINGS</button>
+        <button class="btn-schedule btn-danger" onclick="triggerManualEmergencyStop()" title="Emergency Stop"><i class="fa-solid fa-power-off"></i></button>
     </div>
 
     <div class="modal" id="scheduleHubModal">
@@ -484,10 +484,24 @@ input:focus { border-color: var(--primary); outline: none; }
         <div class="mini-modal">
             <h3><i class="fa-solid fa-triangle-exclamation"></i> EMERGENCY TRIP</h3>
             <p id="criticalAlertDesc" style="font-weight:600; font-size:14px; margin-top:10px;">The system was halted manually.</p>
-            <p style="font-size:11px; color:var(--text-muted); margin-bottom:25px;">All pumps and valves have been safely locked. Please inspect the hardware before resetting.</p>
+            <p style="font-size:11px; color:var(--text-muted); margin-bottom:25px;">All queues wiped. Pumps and valves have been safely locked. Please inspect the hardware before resetting.</p>
             <div class="mini-modal-btns">
                 <button class="btn-confirm" onclick="clearEmergencyStop()" style="width:100%;"><i class="fa-solid fa-rotate-right"></i> Acknowledge & Reset</button>
             </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="autoRecoveryOverlay">
+        <div class="mini-modal">
+            <h3 style="color: var(--warning);"><i class="fa-solid fa-bolt"></i> POWER FAULT DETECTED</h3>
+            <p id="autoRecoveryDesc" style="font-weight:600; font-size:14px; margin-top:10px;"></p>
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="font-size:12px; color:var(--text-main); margin:0;">
+                    <i class="fa-solid fa-stopwatch fa-spin" style="margin-right: 5px;"></i>
+                    Hardware is locked. System is monitoring power for 30 seconds of stability before auto-resuming.
+                </p>
+            </div>
+            <button class="btn-cancel" onclick="document.getElementById('autoRecoveryOverlay').style.display='none'" style="width:100%;">Hide Alert (Resumes in background)</button>
         </div>
     </div>
 
@@ -581,12 +595,13 @@ async function fetchWeather() {
 }
 fetchWeather(); setInterval(fetchWeather, 3600000); 
 
-// --- APP UI LOGIC ---
+// --- APP UI LOGIC (BUILD GRIDS) ---
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const dayVals = [1, 2, 4, 8, 16, 32, 64];
 let localSchedules = {}; let localBwConfig = { active: false, hour: 0, minute: 0, durationMins: 5, days: 0 };
 let currentSysState = {}; let pendingManualType = ""; let pendingManualId = 0; let editingSlotKey = null; 
+let currentInterlockReason = 0; // Track the auto-recovery state
 
-// Build UI Grids
+// Generate HTML Zones & Ferts
 for(let i=1; i<=6; i++) {
     document.getElementById('irr-grid').innerHTML += `<div class="control-card" id="card-irr-${i}"><div class="card-header"><i class="fa-solid fa-droplet card-icon"></i><label class="switch"><input type="checkbox" id="toggle-irr-${i}" onchange="handleManualIrr(${i}, this.checked)"><span class="slider"></span></label></div><div class="card-title">Zone ${i}</div><div class="card-status" id="status-irr-${i}">STANDBY</div></div>`;
 }
@@ -622,23 +637,37 @@ function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-
 // --- DATABASE LISTENERS ---
 function initAppListeners() {
     
-    // --- EMERGENCY STOP LISTENER ---
+    // MANUAL BIG RED BUTTON LISTENER
     db.ref('system/emergencyStop').on('value', (snap) => {
         if (snap.val() === true) {
-            db.ref('system/lastTripReason').once('value').then((res) => {
-                let code = res.val() || 0; let desc = "Manual Emergency Stop Activated.";
-                if(code === 1) desc = "FAULT: Voltage Out of Bounds. Check Grid Power.";
-                if(code === 2) desc = "FAULT: Dry Run Detected (Undercurrent). Check source water.";
-                if(code === 3) desc = "FAULT: Motor Overload Detected (Overcurrent). Check pump.";
-                
-                document.getElementById('criticalAlertDesc').innerText = desc;
-                document.getElementById('criticalAlertOverlay').style.display = 'block';
-                document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error";
-                document.getElementById('hero-title').innerText = "SYSTEM HALTED";
-                document.getElementById('hero-title').style.color = "var(--danger)";
-            });
+            document.getElementById('criticalAlertOverlay').style.display = 'block';
+            document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error";
+            document.getElementById('hero-title').innerText = "SYSTEM HALTED";
+            document.getElementById('hero-title').style.color = "var(--danger)";
         } else {
             document.getElementById('criticalAlertOverlay').style.display = 'none';
+        }
+    });
+
+    // NEW: AUTO-RECOVERY INTERLOCK LISTENER
+    db.ref('system/interlockReason').on('value', (snap) => {
+        let code = snap.val() || 0;
+        currentInterlockReason = code; // Save for UI rendering
+
+        if (code > 0 && !currentSysState.emergencyStop) {
+            let desc = "Hardware Interlock Active.";
+            if(code === 1) desc = "VOLTAGE OUT OF BOUNDS: Grid power is unstable.";
+            if(code === 2) desc = "DRY RUN DETECTED: Current dropped below minimum limit.";
+            if(code === 3) desc = "OVERLOAD DETECTED: Current exceeded maximum limit.";
+            if(code === 4) desc = "SENSOR FAULT: PZEM Power Monitor disconnected.";
+            
+            document.getElementById('autoRecoveryDesc').innerText = desc;
+            document.getElementById('autoRecoveryOverlay').style.display = 'block';
+            document.getElementById('hero-dashboard').className = "telemetry-card telemetry-paused";
+            document.getElementById('hero-title').innerText = "SYSTEM PAUSED";
+            document.getElementById('hero-title').style.color = "var(--warning)";
+        } else {
+            document.getElementById('autoRecoveryOverlay').style.display = 'none';
         }
     });
 
@@ -653,7 +682,7 @@ function initAppListeners() {
 
     db.ref('system').on('value', (snap) => {
         const sys = snap.val() || {}; currentSysState = sys;
-        if (sys.emergencyStop) return; // Freeze UI if tripped
+        if (sys.emergencyStop) return; // Freeze UI if hard-stopped
 
         let isBw = sys.isBackwashActive === true; let activeIrr = sys.activeIrrZone || 0; let activeFert = sys.activeFertZone || 0;
         const hero = document.getElementById('hero-dashboard');
@@ -672,29 +701,43 @@ function initAppListeners() {
             voltUI.innerText = `${parseFloat(sys.voltage).toFixed(1)} V`;
             currUI.innerText = `${parseFloat(sys.current).toFixed(2)} A`;
             powUI.innerText  = `${parseFloat(sys.power).toFixed(0)} W`;
+            
             if (sys.motorConfig && sys.motorConfig.enabled) {
-                if (sys.voltage < sys.motorConfig.minV || sys.voltage > sys.motorConfig.maxV) voltUI.style.color = "var(--danger)";
-                else voltUI.style.color = "var(--text-main)";
+                if (sys.voltage < sys.motorConfig.minV || sys.voltage > sys.motorConfig.maxV) voltUI.className = "power-val power-error";
+                else voltUI.className = "power-val";
+
+                if (sys.pump1Active && sys.current >= 0) {
+                    if (sys.current < sys.motorConfig.minA || sys.current > sys.motorConfig.maxA) currUI.className = "power-val power-error";
+                    else currUI.className = "power-val";
+                } else {
+                    currUI.className = "power-val";
+                }
             }
         }
 
-        if (isBw) {
-            hero.className = "telemetry-card telemetry-bw";
-            document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)";
-            document.getElementById('hero-subtitle').innerText = "System valves are safely locked.";
-        } else if (activeIrr > 0 || activeFert > 0) {
-            hero.className = "telemetry-card telemetry-active";
-            document.getElementById('hero-title').innerText = (activeIrr > 0 ? `ZONE ${activeIrr} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); 
-            document.getElementById('hero-title').style.color = "var(--text-main)";
-            document.getElementById('hero-subtitle').innerText = "Live System Telemetry";
+        // Only override hero color if we aren't currently paused by interlock
+        if (currentInterlockReason === 0) {
+            if (isBw) {
+                hero.className = "telemetry-card telemetry-bw";
+                document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)";
+                document.getElementById('hero-subtitle').innerText = "System valves are safely locked.";
+            } else if (activeIrr > 0 || activeFert > 0) {
+                hero.className = "telemetry-card telemetry-active";
+                document.getElementById('hero-title').innerText = (activeIrr > 0 ? `ZONE ${activeIrr} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); 
+                document.getElementById('hero-title').style.color = "var(--text-main)";
+                document.getElementById('hero-subtitle').innerText = "Live System Telemetry";
+            } else {
+                hero.className = "telemetry-card";
+                document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)";
+                document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution.";
+            }
         } else {
-            hero.className = "telemetry-card";
-            document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)";
-            document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution.";
+            document.getElementById('hero-subtitle').innerText = "Monitoring power stability to resume...";
         }
 
         for(let i=1; i<=6; i++) {
             let toggle = document.getElementById(`toggle-irr-${i}`);
+            // If the user turned it on, keep it visibly ON so they know it intends to run
             toggle.checked = (sys.manualIrrZone === i); toggle.disabled = isBw;
             document.getElementById(`card-irr-${i}`).className = (activeIrr === i) ? "control-card active-irr" : "control-card";
             document.getElementById(`status-irr-${i}`).innerText = (activeIrr === i) ? "FLOW ACTIVE" : "STANDBY";
@@ -739,6 +782,10 @@ function initAppListeners() {
         if (!currentSysState || currentSysState.emergencyStop) return;
         let irrEnd = null; let bwEnd = null;
 
+        // Even if interlocked, we compute the expected end time to keep the countdown visible to the user
+        let logicalIrrZone = currentSysState.activeIrrZone;
+        if (logicalIrrZone === 0 && currentSysState.manualIrrZone > 0) logicalIrrZone = currentSysState.manualIrrZone; // If paused
+
         if (currentSysState.isBackwashActive) {
             if (localBwConfig && localBwConfig.active) {
                 let now = new Date(); if (localBwConfig.days & dayVals[now.getDay()]) {
@@ -750,7 +797,7 @@ function initAppListeners() {
         } else {
             if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrStartTS) {
                 irrEnd = currentSysState.manualIrrStartTS + (currentSysState.manualIrrMins * 60000);
-            } else if (currentSysState.activeIrrZone > 0) {
+            } else if (logicalIrrZone > 0) {
                 let now = new Date(); let currentDayMask = dayVals[now.getDay()]; let currentMs = now.getTime();
                 for (let s = 0; s < 3; s++) {
                     let sched = localSchedules['slot_' + s];
@@ -759,7 +806,7 @@ function initAppListeners() {
                     for (let z = 0; z < 6; z++) {
                         if (!sched.zones || !sched.zones[z] || !sched.zones[z].waterMins) continue;
                         let zoneEnd = currentEpoch + (sched.zones[z].waterMins * 60000);
-                        if (currentSysState.activeIrrZone === (z + 1) && currentMs >= (currentEpoch - 180000) && currentMs <= (zoneEnd + 180000)) irrEnd = zoneEnd;
+                        if (logicalIrrZone === (z + 1) && currentMs >= (currentEpoch - 180000) && currentMs <= (zoneEnd + 180000)) irrEnd = zoneEnd;
                         currentEpoch = zoneEnd;
                     }
                 }
@@ -767,15 +814,17 @@ function initAppListeners() {
         }
 
         let boxI = document.getElementById('timer-box-irr'); let lblI = document.getElementById('timer-label-irr'); let tmrI = document.getElementById('live-timer-irr');
-        if (currentSysState.activeIrrZone > 0) {
+        if (logicalIrrZone > 0) {
             boxI.style.display = "flex";
             if (currentSysState.manualIrrZone > 0 && currentSysState.manualIrrMins === 0) {
-                lblI.innerText = `ZONE ${currentSysState.activeIrrZone} ACTIVE`; tmrI.innerText = "CONT."; tmrI.style.fontSize = "22px"; tmrI.style.lineHeight = "38px";
+                lblI.innerText = currentInterlockReason > 0 ? `ZONE ${logicalIrrZone} PAUSED` : `ZONE ${logicalIrrZone} ACTIVE`; 
+                tmrI.innerText = "CONT."; tmrI.style.fontSize = "22px"; tmrI.style.lineHeight = "38px";
             } else if (irrEnd) {
                 let rem = Math.max(0, Math.floor((irrEnd - Date.now()) / 1000));
                 tmrI.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
-                lblI.innerText = `ZONE ${currentSysState.activeIrrZone} REMAINING`; tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
-            } else { lblI.innerText = `ZONE ${currentSysState.activeIrrZone} ACTIVE`; tmrI.innerText = "--:--"; }
+                lblI.innerText = currentInterlockReason > 0 ? `ZONE ${logicalIrrZone} PAUSED` : `ZONE ${logicalIrrZone} REMAINING`; 
+                tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
+            } else { lblI.innerText = `ZONE ${logicalIrrZone} ACTIVE`; tmrI.innerText = "--:--"; }
         } else { boxI.style.display = "none"; }
 
         let boxB = document.getElementById('timer-box-bw'); let lblB = document.getElementById('timer-label-bw'); let tmrB = document.getElementById('live-timer-bw');
@@ -790,7 +839,7 @@ function initAppListeners() {
     }, 1000);
 }
 
-// --- OVERRIDE ACTIONS ---
+// --- OVERRIDE & MODAL ACTIONS ---
 function handleManualIrr(zoneNum, isChecked) { 
     if(currentSysState.isBackwashActive) return; 
     if (isChecked) {
@@ -825,9 +874,9 @@ function confirmManualTimer() {
     cancelManualTimer();
 }
 
-function emergencyStop(reason) {
-  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES?")) { 
-      db.ref('system').update({ emergencyStop: true, lastTripReason: reason }); 
+function triggerManualEmergencyStop() {
+  if(confirm("🚨 CRITICAL: HALT ALL PUMPS AND VALVES? This will wipe all queues and requires a manual reset.")) { 
+      db.ref('system').update({ emergencyStop: true }); 
   }
 }
 

@@ -621,16 +621,6 @@ function initAppListeners() {
         document.getElementById('motor-fert-ind').className = sys.fertPumpActive ? "motor-indicator motor-on m-fert" : "motor-indicator";
         document.getElementById('motor-fert-ind').innerHTML = sys.fertPumpActive ? `<i class="fa-solid fa-flask"></i> Fert Pump: ON` : `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
 
-        let voltUI = document.getElementById('pzem-volt'); let currUI = document.getElementById('pzem-curr'); let powUI  = document.getElementById('pzem-pow');
-        if(sys.voltage === undefined || sys.voltage < 0) { voltUI.innerHTML = `<span class="power-error">OFFLINE</span>`; currUI.innerHTML = `-- A`; powUI.innerHTML  = `-- W`; } 
-        else {
-            voltUI.innerText = `${parseFloat(sys.voltage).toFixed(1)} V`; currUI.innerText = `${parseFloat(sys.current).toFixed(2)} A`; powUI.innerText  = `${parseFloat(sys.power).toFixed(0)} W`;
-            if (sys.motorConfig && sys.motorConfig.enabled) {
-                if (sys.voltage < sys.motorConfig.minV || sys.voltage > sys.motorConfig.maxV) voltUI.className = "power-val power-error"; else voltUI.className = "power-val";
-                if (sys.pump1Active && sys.current >= 0) { if (sys.current < sys.motorConfig.minA || sys.current > sys.motorConfig.maxA) currUI.className = "power-val power-error"; else currUI.className = "power-val"; } else currUI.className = "power-val";
-            }
-        }
-
         if (currentInterlockReason === 0) {
             if (isBw) { hero.className = "telemetry-card telemetry-bw"; document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)"; document.getElementById('hero-subtitle').innerText = "System valves are safely locked."; } 
             else if (activeIrr > 0 || activeFert > 0) { hero.className = "telemetry-card telemetry-active"; document.getElementById('hero-title').innerText = (activeIrr > 0 ? `ZONE ${activeIrr} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; } 
@@ -682,15 +672,20 @@ function initAppListeners() {
     });
 
     setInterval(() => {
-        // --- REAL-TIME ONLINE & WIFI STATUS CHECK ---
+        // --- LIVE 1-SECOND CONNECTION & POWER DISPLAY CHECK ---
         let isOnline = (Math.floor(Date.now()/1000) - (currentSysState.heartbeat || 0)) < 15;
         let hb = document.getElementById('heartbeat-display');
         let wifiDisplay = document.getElementById('wifi-display');
+        
+        let voltUI = document.getElementById('pzem-volt'); 
+        let currUI = document.getElementById('pzem-curr'); 
+        let powUI  = document.getElementById('pzem-pow');
 
         if(isOnline) {
             hb.className = "connection-status status-online";
             hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`;
 
+            // Render live WiFi signal
             let rssi = currentSysState.rssi || 0;
             let wifiColor = "var(--text-muted)";
             if (rssi < 0) {
@@ -701,10 +696,35 @@ function initAppListeners() {
             } else {
                 wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi"></i> -- dBm`;
             }
+
+            // Render live Power Data
+            if(currentSysState.voltage === undefined || currentSysState.voltage < 0) { 
+                voltUI.innerHTML = `<span class="power-error" style="font-size:14px;"><i class="fa-solid fa-plug-circle-xmark"></i> SENSOR ERROR</span>`; 
+                currUI.innerHTML = `<span style="opacity:0.3;">-- A</span>`; 
+                powUI.innerHTML  = `<span style="opacity:0.3;">-- W</span>`; 
+            } else {
+                voltUI.innerText = `${parseFloat(currentSysState.voltage).toFixed(1)} V`; 
+                currUI.innerText = `${parseFloat(currentSysState.current).toFixed(2)} A`; 
+                powUI.innerText  = `${parseFloat(currentSysState.power).toFixed(0)} W`;
+                
+                if (currentSysState.motorConfig && currentSysState.motorConfig.enabled) {
+                    if (currentSysState.voltage < currentSysState.motorConfig.minV || currentSysState.voltage > currentSysState.motorConfig.maxV) voltUI.className = "power-val power-error"; else voltUI.className = "power-val";
+                    if (currentSysState.pump1Active && currentSysState.current >= 0) { if (currentSysState.current < currentSysState.motorConfig.minA || currentSysState.current > currentSysState.motorConfig.maxA) currUI.className = "power-val power-error"; else currUI.className = "power-val"; } else currUI.className = "power-val";
+                } else {
+                    voltUI.className = "power-val"; currUI.className = "power-val";
+                }
+            }
+
         } else {
+            // Force OFFLINE UI rendering if connection is lost
             hb.className = "connection-status status-offline";
             hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`;
             wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:var(--text-muted); opacity:0.4;"></i> <span style="opacity:0.4;">-- dBm</span>`;
+            
+            voltUI.innerHTML = `<span class="power-error" style="font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> OFFLINE</span>`; 
+            currUI.innerHTML = `<span style="opacity:0.3;">-- A</span>`; 
+            powUI.innerHTML  = `<span style="opacity:0.3;">-- W</span>`;
+            voltUI.className = "power-val"; currUI.className = "power-val";
         }
 
         if (!currentSysState || currentSysState.emergencyStop) return;

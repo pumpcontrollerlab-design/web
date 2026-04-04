@@ -23,7 +23,8 @@
     --fert-color: #10b981; 
     --fert-glow: rgba(16, 185, 129, 0.4);
     --bw-color: #a855f7; 
-    --danger: #ef4444; 
+    --danger: #ef4444;
+    --warning: #f59e0b; 
     --text-main: #f8fafc; 
     --text-muted: #94a3b8; 
     --border-radius: 16px;
@@ -112,7 +113,7 @@ body {
 .telemetry-active::before { background: var(--primary); box-shadow: 0 0 15px var(--primary); }
 .telemetry-bw::before { background: var(--bw-color); box-shadow: 0 0 15px var(--bw-color); }
 
-.telemetry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;}
+.telemetry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;}
 .telemetry-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin: 0; }
 .telemetry-main-status { font-size: 28px; font-weight: 800; margin: 10px 0 5px 0; color: var(--text-main); }
 .telemetry-sub { font-size: 15px; color: var(--text-muted); font-weight: 500; }
@@ -133,12 +134,22 @@ body {
 .motor-on.m-main i { color: var(--primary); text-shadow: 0 0 10px var(--primary-glow); }
 .motor-on.m-fert i { color: var(--fert-color); text-shadow: 0 0 10px var(--fert-glow); }
 
+/* --- NEW: AC POWER CONSOLE --- */
+.power-status-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; 
+    margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;
+}
+.power-box { background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center; }
+.power-label { font-size: 10px; color: var(--text-muted); font-weight: 800; letter-spacing: 1px; margin-bottom: 5px;}
+.power-val { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--text-main); }
+.power-error { color: var(--danger); font-size: 14px; }
+
 /* Weather Card */
 .weather-card {
     background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--border-radius);
     padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
 }
-.weather-icon { font-size: 42px; color: #f59e0b; margin-bottom: 15px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
+.weather-icon { font-size: 42px; color: var(--warning); margin-bottom: 15px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
 .weather-temp { font-family: var(--font-mono); font-size: 36px; font-weight: 700; margin: 0; }
 .weather-desc { font-size: 14px; color: var(--text-muted); font-weight: 500; margin-top: 5px; text-transform: capitalize;}
 .weather-location { 
@@ -306,6 +317,22 @@ input:focus { border-color: var(--primary); outline: none; }
                         <i class="fa-solid fa-flask"></i> Fert Pump: OFF
                     </div>
                 </div>
+
+                <div class="power-status-grid">
+                    <div class="power-box">
+                        <div class="power-label"><i class="fa-solid fa-bolt"></i> VOLTAGE</div>
+                        <div class="power-val" id="pzem-volt">-- V</div>
+                    </div>
+                    <div class="power-box">
+                        <div class="power-label"><i class="fa-solid fa-wave-square"></i> CURRENT</div>
+                        <div class="power-val" id="pzem-curr">-- A</div>
+                    </div>
+                    <div class="power-box">
+                        <div class="power-label"><i class="fa-solid fa-plug"></i> POWER</div>
+                        <div class="power-val" id="pzem-pow">-- W</div>
+                    </div>
+                </div>
+
             </div>
 
             <div class="weather-card">
@@ -725,6 +752,28 @@ function initAppListeners() {
         if (sys.pump1Active) { motorMain.className = "motor-indicator motor-on m-main"; motorMain.innerHTML = `<i class="fa-solid fa-water"></i> Main Pump: ON`; }
         if (sys.fertPumpActive) { motorFert.className = "motor-indicator motor-on m-fert"; motorFert.innerHTML = `<i class="fa-solid fa-flask"></i> Fert Pump: ON`; }
 
+        // --- NEW: Update PZEM Power UI ---
+        let voltUI = document.getElementById('pzem-volt');
+        let currUI = document.getElementById('pzem-curr');
+        let powUI  = document.getElementById('pzem-pow');
+
+        if(sys.voltage === undefined || sys.voltage < 0) {
+            voltUI.innerHTML = `<span class="power-error">OFFLINE</span>`;
+            currUI.innerHTML = `-- A`;
+            powUI.innerHTML  = `-- W`;
+        } else {
+            voltUI.innerText = `${parseFloat(sys.voltage).toFixed(1)} V`;
+            currUI.innerText = `${parseFloat(sys.current).toFixed(2)} A`;
+            powUI.innerText  = `${parseFloat(sys.power).toFixed(0)} W`;
+            
+            // Optional warning style for low voltage before pumping
+            if (sys.voltage < 190 && !sys.pump1Active) {
+                voltUI.style.color = "var(--danger)";
+            } else {
+                voltUI.style.color = "var(--text-main)";
+            }
+        }
+
         if (isBw) {
             hero.className = "telemetry-card telemetry-bw";
             document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)";
@@ -915,7 +964,7 @@ function saveSchedule() {
                 startH = parseInt(timeVal.split(':')[0]);
                 startM = parseInt(timeVal.split(':')[1]);
             } else {
-                continue; // Prevent saving if time isn't selected
+                continue; 
             }
 
             let fDaysMask = 0; document.querySelectorAll(`.f-day-${z}-${f}:checked`).forEach(cb => fDaysMask += parseInt(cb.value));

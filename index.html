@@ -80,10 +80,9 @@ body {
 .header-right { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: flex-end;}
 .sys-clock { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-muted); background: var(--card-bg); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--card-border);}
 
-/* NEW WIFI BADGE */
-.wifi-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 6px;}
+.wifi-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--card-border); display: flex; align-items: center; gap: 6px; transition: all 0.3s;}
 
-.connection-status { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 1px;}
+.connection-status { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s;}
 .status-online { background: rgba(16, 185, 129, 0.1); color: var(--fert-color); border: 1px solid var(--fert-color); }
 .status-offline { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
 .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; box-shadow: 0 0 8px currentColor; animation: pulse 2s infinite; }
@@ -622,18 +621,6 @@ function initAppListeners() {
         document.getElementById('motor-fert-ind').className = sys.fertPumpActive ? "motor-indicator motor-on m-fert" : "motor-indicator";
         document.getElementById('motor-fert-ind').innerHTML = sys.fertPumpActive ? `<i class="fa-solid fa-flask"></i> Fert Pump: ON` : `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
 
-        // NEW: LIVE WIFI SIGNAL UPDATE
-        let rssi = sys.rssi || 0;
-        let wifiColor = "var(--text-muted)";
-        if (rssi < 0) {
-            if (rssi > -60) { wifiColor = "var(--fert-color)"; } 
-            else if (rssi > -75) { wifiColor = "var(--warning)"; } 
-            else { wifiColor = "var(--danger)"; } 
-            document.getElementById('wifi-display').innerHTML = `<i class="fa-solid fa-wifi" style="color:${wifiColor}"></i> ${rssi} dBm`;
-        } else {
-            document.getElementById('wifi-display').innerHTML = `<i class="fa-solid fa-wifi"></i> -- dBm`;
-        }
-
         let voltUI = document.getElementById('pzem-volt'); let currUI = document.getElementById('pzem-curr'); let powUI  = document.getElementById('pzem-pow');
         if(sys.voltage === undefined || sys.voltage < 0) { voltUI.innerHTML = `<span class="power-error">OFFLINE</span>`; currUI.innerHTML = `-- A`; powUI.innerHTML  = `-- W`; } 
         else {
@@ -675,10 +662,6 @@ function initAppListeners() {
             }
             card.className = (activeFert === i) ? "control-card active-fert" : "control-card";
         }
-
-        let hb = document.getElementById('heartbeat-display');
-        if((Math.floor(Date.now()/1000) - (sys.heartbeat || 0)) < 15) { hb.className = "connection-status status-online"; hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`; } 
-        else { hb.className = "connection-status status-offline"; hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`; }
     });
 
     db.ref('schedules').on('value', (snap) => {
@@ -699,6 +682,31 @@ function initAppListeners() {
     });
 
     setInterval(() => {
+        // --- REAL-TIME ONLINE & WIFI STATUS CHECK ---
+        let isOnline = (Math.floor(Date.now()/1000) - (currentSysState.heartbeat || 0)) < 15;
+        let hb = document.getElementById('heartbeat-display');
+        let wifiDisplay = document.getElementById('wifi-display');
+
+        if(isOnline) {
+            hb.className = "connection-status status-online";
+            hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`;
+
+            let rssi = currentSysState.rssi || 0;
+            let wifiColor = "var(--text-muted)";
+            if (rssi < 0) {
+                if (rssi > -60) { wifiColor = "var(--fert-color)"; }
+                else if (rssi > -75) { wifiColor = "var(--warning)"; }
+                else { wifiColor = "var(--danger)"; }
+                wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:${wifiColor}"></i> ${rssi} dBm`;
+            } else {
+                wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi"></i> -- dBm`;
+            }
+        } else {
+            hb.className = "connection-status status-offline";
+            hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`;
+            wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:var(--text-muted); opacity:0.4;"></i> <span style="opacity:0.4;">-- dBm</span>`;
+        }
+
         if (!currentSysState || currentSysState.emergencyStop) return;
         let irrEnd = null; let bwEnd = null;
 

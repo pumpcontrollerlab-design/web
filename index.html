@@ -585,8 +585,9 @@ function initAppListeners() {
             db.ref('system/lastTripReason').once('value').then((res) => {
                 let code = res.val() || 0; let desc = "Manual Emergency Stop Activated.";
                 if(code === 1) desc = "FAULT [VOLTAGE]: Grid power is out of safe bounds. Motor halted to prevent coil damage.";
-                if(code === 2) desc = "FAULT [DRY RUN]: Current dropped below minimum limit. Max auto-retries (3) reached. Check the water source.";
-                if(code === 3) desc = "FAULT [OVERLOAD]: Current exceeded maximum limit. Max auto-retries (3) reached. The motor may be jammed.";
+                // NEW: Updated to explicitly say "Max auto-retries (1)"
+                if(code === 2) desc = "FAULT [DRY RUN]: Current dropped below minimum limit. Max auto-retries (1) reached. Check the water source.";
+                if(code === 3) desc = "FAULT [OVERLOAD]: Current exceeded maximum limit. Max auto-retries (1) reached. The motor may be jammed.";
                 if(code === 4) desc = "FAULT [SENSOR]: PZEM Power Monitor disconnected or unreadable.";
                 document.getElementById('criticalAlertDesc').innerText = desc; document.getElementById('criticalAlertOverlay').style.display = 'block'; document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error"; document.getElementById('hero-title').innerText = "SYSTEM HALTED"; document.getElementById('hero-title').style.color = "var(--danger)";
             });

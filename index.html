@@ -585,8 +585,8 @@ function initAppListeners() {
             db.ref('system/lastTripReason').once('value').then((res) => {
                 let code = res.val() || 0; let desc = "Manual Emergency Stop Activated.";
                 if(code === 1) desc = "FAULT [VOLTAGE]: Grid power is out of safe bounds. Motor halted to prevent coil damage.";
-                if(code === 2) desc = "FAULT [DRY RUN]: Current dropped below minimum limit. Check the water source.";
-                if(code === 3) desc = "FAULT [OVERLOAD]: Current exceeded maximum limit. The motor may be jammed.";
+                if(code === 2) desc = "FAULT [DRY RUN]: Current dropped below minimum limit. Max auto-retries (3) reached. Check the water source.";
+                if(code === 3) desc = "FAULT [OVERLOAD]: Current exceeded maximum limit. Max auto-retries (3) reached. The motor may be jammed.";
                 if(code === 4) desc = "FAULT [SENSOR]: PZEM Power Monitor disconnected or unreadable.";
                 document.getElementById('criticalAlertDesc').innerText = desc; document.getElementById('criticalAlertOverlay').style.display = 'block'; document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error"; document.getElementById('hero-title').innerText = "SYSTEM HALTED"; document.getElementById('hero-title').style.color = "var(--danger)";
             });
@@ -672,8 +672,7 @@ function initAppListeners() {
     });
 
     setInterval(() => {
-        // --- LIVE 1-SECOND CONNECTION & POWER DISPLAY CHECK ---
-        let isOnline = (Math.floor(Date.now()/1000) - (currentSysState.heartbeat || 0)) < 15;
+        let isOnline = (Math.floor(Date.now()/1000) - (currentSysState.heartbeat || 0)) < 25;
         let hb = document.getElementById('heartbeat-display');
         let wifiDisplay = document.getElementById('wifi-display');
         
@@ -685,7 +684,6 @@ function initAppListeners() {
             hb.className = "connection-status status-online";
             hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`;
 
-            // Render live WiFi signal
             let rssi = currentSysState.rssi || 0;
             let wifiColor = "var(--text-muted)";
             if (rssi < 0) {
@@ -697,7 +695,6 @@ function initAppListeners() {
                 wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi"></i> -- dBm`;
             }
 
-            // Render live Power Data
             if(currentSysState.voltage === undefined || currentSysState.voltage < 0) { 
                 voltUI.innerHTML = `<span class="power-error" style="font-size:14px;"><i class="fa-solid fa-plug-circle-xmark"></i> SENSOR ERROR</span>`; 
                 currUI.innerHTML = `<span style="opacity:0.3;">-- A</span>`; 
@@ -716,7 +713,6 @@ function initAppListeners() {
             }
 
         } else {
-            // Force OFFLINE UI rendering if connection is lost
             hb.className = "connection-status status-offline";
             hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`;
             wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:var(--text-muted); opacity:0.4;"></i> <span style="opacity:0.4;">-- dBm</span>`;

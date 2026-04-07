@@ -114,8 +114,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: var(--text-main); transition: .3s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider.fert-slider { background-color: var(--fert-color); }
-input:checked + .slider.bw-slider { background-color: var(--bw-color); }
-input:checked + .slider.warn-slider { background-color: var(--warning); }
 input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 
@@ -419,7 +417,7 @@ async function saveLocation() {
     } catch(e) { alert("Error finding location."); document.getElementById('weather-desc').innerText = "Network Error"; }
 }
 
-// MODERN OPEN-METEO V1 API FIX
+// MODERN OPEN-METEO V1 API
 async function fetchWeather() {
     try {
         document.getElementById('loc-name').innerText = weatherCity;
@@ -437,7 +435,7 @@ async function fetchWeather() {
         
         document.getElementById('weather-icon').className = `fa-solid ${icon} weather-icon`;
     } catch (e) { 
-        console.error(e);
+        console.error("Weather fetch failed", e);
         document.getElementById('weather-desc').innerText = "Data unavailable"; 
     }
 }
@@ -527,12 +525,10 @@ function initAppListeners() {
         if(conf.minA) document.getElementById('prot-min-a').value = conf.minA; if(conf.maxA) document.getElementById('prot-max-a').value = conf.maxA;
     });
 
-    // ONLY use this listener to store state. ALL UI rendering happens in the clock interval!
+    // PURE STATE LISTENER - Logging manual events
     let lastStateIrr = 0; let lastStateFert = 0;
     db.ref('system').on('value', (snap) => {
         currentSysState = snap.val() || {};
-        
-        // Log manual overrides if they happen via Firebase directly
         let mI = currentSysState.manualIrrZone || 0; let mF = currentSysState.manualFertZone || 0;
         if(mI !== lastStateIrr && mI > 0) logActivity(`💦 Manual Water: Zone ${mI} Started`);
         if(mF !== lastStateFert && mF > 0) logActivity(`🧪 Manual Fert: Comp ${mF} Started`);
@@ -568,36 +564,16 @@ function initAppListeners() {
         let nowSec = Math.floor(Date.now() / 1000);
         let isOnline = (nowSec - (sys.heartbeat || 0)) < 25;
         
-        // Base States from Firebase
+        // Exact hardware states pulled purely from ESP32 data
         let activeIrr = sys.activeIrrZone || 0; 
         let activeFert = sys.activeFertZone || 0;
         let manIrr = sys.manualIrrZone || 0;
         let manFert = sys.manualFertZone || 0;
         let p1Active = sys.pump1Active === true;
         let fPumpActive = sys.fertPumpActive === true;
-        let isBw = sys.isBackwashActive === true;
-
         let irrStop = sys.activeIrrStop || 0;
-        let fertStop = sys.activeFertStop || 0;
 
-        // --- THE FIX: SMART FRONTEND AUTONOMY OVERRIDE ---
-        // If the internet drops, Firebase stops updating. But the dashboard knows exactly 
-        // when the motor physically stops. When the clock hits that time, we manually force the UI to STANDBY.
-        if (irrStop > 0 && nowSec >= irrStop) {
-            activeIrr = 0;
-            manIrr = 0;
-            p1Active = false; // Motor is definitely off
-        }
-        if (fertStop > 0 && nowSec >= fertStop) {
-            activeFert = 0;
-            manFert = 0;
-            fPumpActive = false;
-        }
-        if (sys.emergencyStop) {
-            activeIrr = 0; activeFert = 0; manIrr = 0; manFert = 0; p1Active = false; fPumpActive = false; isBw = false;
-        }
-
-        // Logical Display Handlers
+        // Visual Display Resolver (If ESP32 is reporting it's active, show it!)
         let displayIrrZone = activeIrr > 0 ? activeIrr : (manIrr > 0 ? manIrr : 0);
 
         // 1. CONNECTION UI
@@ -627,11 +603,7 @@ function initAppListeners() {
         // 2. HERO DASHBOARD UI
         const hero = document.getElementById('hero-dashboard');
         if (currentInterlockReason === 0 && !sys.emergencyStop) {
-            if (isBw) { 
-                hero.className = "telemetry-card telemetry-bw"; 
-                document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)"; document.getElementById('hero-subtitle').innerText = "System valves are safely locked."; 
-            } 
-            else if (displayIrrZone > 0 || activeFert > 0) { 
+            if (displayIrrZone > 0 || activeFert > 0) { 
                 hero.className = "telemetry-card telemetry-active"; 
                 document.getElementById('hero-title').innerText = (displayIrrZone > 0 ? `ZONE ${displayIrrZone} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; 
             } 
@@ -657,7 +629,7 @@ function initAppListeners() {
             if (activeFert > 0) feed.push(`<span class="feed-item">🧪 Comp ${activeFert} Open</span>`);
             if(feed.length === 1) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`);
         } else {
-            feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - Displaying predicted state</span>`);
+            feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - Showing Last Known State</span>`);
         }
         document.getElementById('live-feed').innerHTML = feed.join('');
 
@@ -665,7 +637,6 @@ function initAppListeners() {
         for(let i=1; i<=6; i++) {
             let toggle = document.getElementById(`toggle-irr-${i}`);
             toggle.checked = (manIrr === i);
-            toggle.disabled = isBw;
             document.getElementById(`card-irr-${i}`).className = (displayIrrZone === i) ? "control-card active-irr" : "control-card";
             document.getElementById(`status-irr-${i}`).innerText = (displayIrrZone === i) ? "FLOW ACTIVE" : "STANDBY";
         }
@@ -685,15 +656,20 @@ function initAppListeners() {
             card.className = (activeFert === i) ? "control-card active-fert" : "control-card";
         }
 
-        // 7. LIVE TIMERS UI
+        // 7. LIVE TIMERS UI (Safely resolving <= 0)
         let boxI = document.getElementById('timer-box-irr'); let lblI = document.getElementById('timer-label-irr'); let tmrI = document.getElementById('live-timer-irr');
         if (displayIrrZone > 0 && !sys.emergencyStop) {
             boxI.style.display = "flex";
             if (irrStop > 0) { 
-                let rem = Math.max(0, irrStop - nowSec);
+                let rem = irrStop - nowSec;
                 if(rem > 0) {
                     tmrI.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
                     lblI.innerText = currentInterlockReason > 0 ? `ZONE ${displayIrrZone} PAUSED` : `ZONE ${displayIrrZone} REMAINING`; 
+                    tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
+                } else {
+                    // This elegantly catches internet drops! It shows finishing until the ESP32 reconnects and clears it.
+                    lblI.innerText = `ZONE ${displayIrrZone} FINISHING...`;
+                    tmrI.innerText = "00:00";
                     tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
                 }
             } 
@@ -723,7 +699,11 @@ function handleManualFert(compNum, isChecked) {
 function cancelManualTimer() { document.getElementById('manualTimerOverlay').style.display = "none"; }
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
-    if (pendingManualType === "irr") db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins }); else if (pendingManualType === "fert") db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins });
+    // Push active stop to 0 immediately to prevent old UI timers from flashing
+    currentSysState.activeIrrStop = 0; currentSysState.activeFertStop = 0; 
+    
+    if (pendingManualType === "irr") db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, activeIrrStop: 0 }); 
+    else if (pendingManualType === "fert") db.ref('system').update({ manualFertZone: pendingManualId, manualFertMins: mins, activeFertStop: 0 });
     cancelManualTimer();
 }
 

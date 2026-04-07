@@ -64,9 +64,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color
 .telemetry-main-status { font-size: 28px; font-weight: 800; margin: 10px 0 5px 0; color: var(--text-main); }
 .telemetry-sub { font-size: 15px; color: var(--text-muted); font-weight: 500; }
 
-.timers-container { display: flex; gap: 30px; justify-content: flex-end; align-items: center; display: none;}
+.timers-container { display: flex; gap: 25px; justify-content: flex-end; align-items: center; display: flex;}
 .timer-box { display: flex; flex-direction: column; align-items: center; }
-.timer-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.timer-label { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; text-align: center; }
 .live-timer { font-family: var(--font-mono); font-size: 32px; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
 .telemetry-active .timers-container, .telemetry-bw .timers-container, .telemetry-paused .timers-container { display: flex; }
 .telemetry-active .timer-label, .telemetry-bw .timer-label, .telemetry-paused .timer-label { color: rgba(255,255,255,0.7); }
@@ -114,6 +114,8 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: var(--text-main); transition: .3s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider.fert-slider { background-color: var(--fert-color); }
+input:checked + .slider.bw-slider { background-color: var(--bw-color); }
+input:checked + .slider.warn-slider { background-color: var(--warning); }
 input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 input:disabled + .slider { opacity: 0.3; cursor: not-allowed; }
 
@@ -217,6 +219,10 @@ input:focus { border-color: var(--primary); outline: none; }
                         <div class="timer-box" id="timer-box-irr" style="display:none;">
                             <div class="timer-label" id="timer-label-irr">ZONE REMAINING</div>
                             <div class="live-timer" id="live-timer-irr">00:00</div>
+                        </div>
+                        <div class="timer-box" id="timer-box-fert" style="display:none;">
+                            <div class="timer-label" id="timer-label-fert" style="color:var(--fert-color);">COMP REMAINING</div>
+                            <div class="live-timer" id="live-timer-fert" style="color:var(--fert-color);">00:00</div>
                         </div>
                     </div>
                 </div>
@@ -417,7 +423,6 @@ async function saveLocation() {
     } catch(e) { alert("Error finding location."); document.getElementById('weather-desc').innerText = "Network Error"; }
 }
 
-// MODERN OPEN-METEO V1 API
 async function fetchWeather() {
     try {
         document.getElementById('loc-name').innerText = weatherCity;
@@ -525,7 +530,7 @@ function initAppListeners() {
         if(conf.minA) document.getElementById('prot-min-a').value = conf.minA; if(conf.maxA) document.getElementById('prot-max-a').value = conf.maxA;
     });
 
-    // PURE STATE LISTENER - Logging manual events
+    // PURE STATE LISTENER
     let lastStateIrr = 0; let lastStateFert = 0;
     db.ref('system').on('value', (snap) => {
         currentSysState = snap.val() || {};
@@ -572,9 +577,11 @@ function initAppListeners() {
         let p1Active = sys.pump1Active === true;
         let fPumpActive = sys.fertPumpActive === true;
         let irrStop = sys.activeIrrStop || 0;
+        let fertStop = sys.activeFertStop || 0;
 
-        // Visual Display Resolver (If ESP32 is reporting it's active, show it!)
+        // Visual Display Resolver (Always trust ESP32 first)
         let displayIrrZone = activeIrr > 0 ? activeIrr : (manIrr > 0 ? manIrr : 0);
+        let displayFertZone = activeFert > 0 ? activeFert : (manFert > 0 ? manFert : 0);
 
         // 1. CONNECTION UI
         let hb = document.getElementById('heartbeat-display'); let wifiDisplay = document.getElementById('wifi-display');
@@ -603,9 +610,9 @@ function initAppListeners() {
         // 2. HERO DASHBOARD UI
         const hero = document.getElementById('hero-dashboard');
         if (currentInterlockReason === 0 && !sys.emergencyStop) {
-            if (displayIrrZone > 0 || activeFert > 0) { 
+            if (displayIrrZone > 0 || displayFertZone > 0) { 
                 hero.className = "telemetry-card telemetry-active"; 
-                document.getElementById('hero-title').innerText = (displayIrrZone > 0 ? `ZONE ${displayIrrZone} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; 
+                document.getElementById('hero-title').innerText = (displayIrrZone > 0 ? `ZONE ${displayIrrZone} ` : "") + (displayFertZone > 0 ? `| COMP ${displayFertZone}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; 
             } 
             else { 
                 hero.className = "telemetry-card"; 
@@ -626,17 +633,18 @@ function initAppListeners() {
             if (p1Active) feed.push(`<span class="feed-item" style="background:var(--primary);">💦 Main Pump Running</span>`);
             if (fPumpActive) feed.push(`<span class="feed-item" style="background:var(--fert-color);">🧪 Fert Pump Running</span>`);
             if (displayIrrZone > 0) feed.push(`<span class="feed-item">📍 Zone ${displayIrrZone} Open</span>`);
-            if (activeFert > 0) feed.push(`<span class="feed-item">🧪 Comp ${activeFert} Open</span>`);
+            if (displayFertZone > 0) feed.push(`<span class="feed-item">🧪 Comp ${displayFertZone} Open</span>`);
             if(feed.length === 1) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`);
         } else {
-            feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - Showing Last Known State</span>`);
+            feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - Displaying predicted state</span>`);
         }
         document.getElementById('live-feed').innerHTML = feed.join('');
 
-        // 5. ZONE CARDS & TOGGLES
+        // 5. ZONE CARDS & TOGGLES (Fixed for Scheduled Runs)
         for(let i=1; i<=6; i++) {
             let toggle = document.getElementById(`toggle-irr-${i}`);
-            toggle.checked = (manIrr === i);
+            // The magic fix: Toggle perfectly reflects the display zone, manually or scheduled
+            toggle.checked = (displayIrrZone === i);
             document.getElementById(`card-irr-${i}`).className = (displayIrrZone === i) ? "control-card active-irr" : "control-card";
             document.getElementById(`status-irr-${i}`).innerText = (displayIrrZone === i) ? "FLOW ACTIVE" : "STANDBY";
         }
@@ -645,18 +653,18 @@ function initAppListeners() {
         let disableFerts = (displayIrrZone === 0);
         for(let i=1; i<=4; i++) {
             let toggle = document.getElementById(`toggle-fert-${i}`);
-            toggle.checked = (manFert === i);
+            toggle.checked = (displayFertZone === i);
             toggle.disabled = disableFerts; 
             let card = document.getElementById(`card-fert-${i}`);
             if (disableFerts) { 
                 card.style.opacity = "0.4"; card.style.pointerEvents = "none"; document.getElementById(`status-fert-${i}`).innerText = "DISABLED"; 
             } else { 
-                card.style.opacity = "1"; card.style.pointerEvents = "auto"; document.getElementById(`status-fert-${i}`).innerText = (activeFert === i) ? "INJECTING" : "STANDBY"; 
+                card.style.opacity = "1"; card.style.pointerEvents = "auto"; document.getElementById(`status-fert-${i}`).innerText = (displayFertZone === i) ? "INJECTING" : "STANDBY"; 
             }
-            card.className = (activeFert === i) ? "control-card active-fert" : "control-card";
+            card.className = (displayFertZone === i) ? "control-card active-fert" : "control-card";
         }
 
-        // 7. LIVE TIMERS UI (Safely resolving <= 0)
+        // 7. DUAL LIVE TIMERS UI
         let boxI = document.getElementById('timer-box-irr'); let lblI = document.getElementById('timer-label-irr'); let tmrI = document.getElementById('live-timer-irr');
         if (displayIrrZone > 0 && !sys.emergencyStop) {
             boxI.style.display = "flex";
@@ -667,7 +675,6 @@ function initAppListeners() {
                     lblI.innerText = currentInterlockReason > 0 ? `ZONE ${displayIrrZone} PAUSED` : `ZONE ${displayIrrZone} REMAINING`; 
                     tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
                 } else {
-                    // This elegantly catches internet drops! It shows finishing until the ESP32 reconnects and clears it.
                     lblI.innerText = `ZONE ${displayIrrZone} FINISHING...`;
                     tmrI.innerText = "00:00";
                     tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
@@ -678,6 +685,27 @@ function initAppListeners() {
                 tmrI.innerText = "CONT."; tmrI.style.fontSize = "22px"; tmrI.style.lineHeight = "38px"; 
             }
         } else { boxI.style.display = "none"; }
+
+        let boxF = document.getElementById('timer-box-fert'); let lblF = document.getElementById('timer-label-fert'); let tmrF = document.getElementById('live-timer-fert');
+        if (displayFertZone > 0 && !sys.emergencyStop) {
+            boxF.style.display = "flex";
+            if (fertStop > 0) {
+                let remF = fertStop - nowSec;
+                if(remF > 0) {
+                    tmrF.innerText = `${Math.floor(remF / 60).toString().padStart(2, '0')}:${(remF % 60).toString().padStart(2, '0')}`;
+                    lblF.innerText = `COMP ${displayFertZone} REMAINING`;
+                    tmrF.style.fontSize = "32px"; tmrF.style.lineHeight = "normal";
+                } else {
+                    lblF.innerText = `COMP ${displayFertZone} FINISHING...`;
+                    tmrF.innerText = "00:00";
+                    tmrF.style.fontSize = "32px"; tmrF.style.lineHeight = "normal";
+                }
+            } else {
+                lblF.innerText = `COMP ${displayFertZone} ACTIVE`;
+                tmrF.innerText = "CONT."; tmrF.style.fontSize = "22px"; tmrF.style.lineHeight = "38px";
+            }
+        } else { boxF.style.display = "none"; }
+        
     }, 1000);
 }
 
@@ -685,7 +713,7 @@ function handleManualIrr(zoneNum, isChecked) {
     if (isChecked) {
         document.getElementById(`toggle-irr-${zoneNum}`).checked = false; pendingManualType = "irr"; pendingManualId = zoneNum;
         document.getElementById('manualTimerTitle').innerText = `ENGAGE ZONE ${zoneNum}`; document.getElementById('manualTimerDesc').innerText = `Enter override duration in minutes. (0 = Continuous)`; document.getElementById('manualTimerMins').value = "10"; document.getElementById('manualTimerConfirmBtn').style.background = "var(--primary)"; document.getElementById('manualTimerOverlay').style.display = "block";
-    } else { db.ref('system').update({ manualIrrZone: 0, manualIrrMins: 0 }); }
+    } else { db.ref('system').update({ manualIrrZone: 0, manualIrrMins: 0, activeIrrStop: 0 }); }
 }
 
 function handleManualFert(compNum, isChecked) { 
@@ -693,13 +721,12 @@ function handleManualFert(compNum, isChecked) {
     if (isChecked) {
         document.getElementById(`toggle-fert-${compNum}`).checked = false; pendingManualType = "fert"; pendingManualId = compNum;
         document.getElementById('manualTimerTitle').innerText = `ENGAGE COMPARTMENT ${compNum}`; document.getElementById('manualTimerDesc').innerText = `Timer will automatically synchronize with active water limits.`; document.getElementById('manualTimerMins').value = "5"; document.getElementById('manualTimerConfirmBtn').style.background = "var(--fert-color)"; document.getElementById('manualTimerOverlay').style.display = "block";
-    } else { db.ref('system').update({ manualFertZone: 0, manualFertMins: 0 }); }
+    } else { db.ref('system').update({ manualFertZone: 0, manualFertMins: 0, activeFertStop: 0 }); }
 }
 
 function cancelManualTimer() { document.getElementById('manualTimerOverlay').style.display = "none"; }
 function confirmManualTimer() {
     let mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
-    // Push active stop to 0 immediately to prevent old UI timers from flashing
     currentSysState.activeIrrStop = 0; currentSysState.activeFertStop = 0; 
     
     if (pendingManualType === "irr") db.ref('system').update({ manualIrrZone: pendingManualId, manualIrrMins: mins, activeIrrStop: 0 }); 

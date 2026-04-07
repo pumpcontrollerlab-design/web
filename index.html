@@ -179,11 +179,6 @@ input:focus { border-color: var(--primary); outline: none; }
 
 #autoRecoveryOverlay .mini-modal { border: 2px solid var(--warning); box-shadow: 0 0 30px rgba(245, 158, 11, 0.4); }
 #autoRecoveryOverlay h3 { color: var(--warning); }
-
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-dark); }
-::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -322,7 +317,7 @@ input:focus { border-color: var(--primary); outline: none; }
                     <button class="btn-cancel" style="padding: 6px 12px; font-size:12px;" onclick="addStartTime()"><i class="fa-solid fa-plus"></i> Add Time</button>
                 </div>
                 <div id="start-times-container" style="display:flex; flex-direction:column; gap:10px;">
-                    </div>
+                </div>
             </div>
             <div class="setup-card">
                 <h3>Watering Days</h3>
@@ -424,7 +419,7 @@ async function saveLocation() {
     } catch(e) { alert("Error finding location."); document.getElementById('weather-desc').innerText = "Network Error"; }
 }
 
-// MODERN OPEN-METEO V1 API
+// MODERN OPEN-METEO V1 API FIX
 async function fetchWeather() {
     try {
         document.getElementById('loc-name').innerText = weatherCity;
@@ -486,6 +481,16 @@ function addFertRow(zoneIdx) {
 }
 function removeFertRow(zoneIdx, rowId) { let el = document.getElementById(`frow-${zoneIdx}-${rowId}`); if(el) el.remove(); }
 
+function logActivity(message) {
+    let now = new Date();
+    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let logList = document.getElementById('activity-log');
+    let newLi = document.createElement('li');
+    newLi.innerHTML = `<span class="log-time">${timeStr}</span> ${message}`;
+    logList.insertBefore(newLi, logList.firstChild);
+    if(logList.children.length > 6) logList.removeChild(logList.lastChild);
+}
+
 function initAppListeners() {
     db.ref('system/emergencyStop').on('value', (snap) => {
         if (snap.val() === true) {
@@ -495,7 +500,7 @@ function initAppListeners() {
                 if(code === 2) desc = "FAULT [DRY RUN]: Current dropped below minimum limit. Max auto-retries reached. Check the water source.";
                 if(code === 3) desc = "FAULT [OVERLOAD]: Current exceeded maximum limit. Max auto-retries reached. The motor may be jammed.";
                 if(code === 4) desc = "FAULT [SENSOR]: PZEM Power Monitor disconnected or unreadable.";
-                document.getElementById('criticalAlertDesc').innerText = desc; document.getElementById('criticalAlertOverlay').style.display = 'block'; document.getElementById('hero-dashboard').className = "telemetry-card telemetry-error"; document.getElementById('hero-title').innerText = "SYSTEM HALTED"; document.getElementById('hero-title').style.color = "var(--danger)";
+                document.getElementById('criticalAlertDesc').innerText = desc; document.getElementById('criticalAlertOverlay').style.display = 'block'; 
                 
                 clearTimeout(alertTimeout);
                 alertTimeout = setTimeout(() => { clearEmergencyStop(); }, 10000);
@@ -509,7 +514,7 @@ function initAppListeners() {
             let desc = "Hardware Interlock Active.";
             if(code === 1) desc = "VOLTAGE OUT OF BOUNDS: Grid power is unstable."; if(code === 2) desc = "DRY RUN DETECTED: Current dropped below minimum limit.";
             if(code === 3) desc = "OVERLOAD DETECTED: Current exceeded maximum limit."; if(code === 4) desc = "SENSOR FAULT: PZEM Power Monitor disconnected.";
-            document.getElementById('autoRecoveryDesc').innerText = desc; document.getElementById('autoRecoveryOverlay').style.display = 'block'; document.getElementById('hero-dashboard').className = "telemetry-card telemetry-paused"; document.getElementById('hero-title').innerText = "SYSTEM PAUSED"; document.getElementById('hero-title').style.color = "var(--warning)";
+            document.getElementById('autoRecoveryDesc').innerText = desc; document.getElementById('autoRecoveryOverlay').style.display = 'block'; 
             
             clearTimeout(interlockTimeout);
             interlockTimeout = setTimeout(() => { document.getElementById('autoRecoveryOverlay').style.display = 'none'; }, 10000);
@@ -522,41 +527,16 @@ function initAppListeners() {
         if(conf.minA) document.getElementById('prot-min-a').value = conf.minA; if(conf.maxA) document.getElementById('prot-max-a').value = conf.maxA;
     });
 
+    // ONLY use this listener to store state. ALL UI rendering happens in the clock interval!
+    let lastStateIrr = 0; let lastStateFert = 0;
     db.ref('system').on('value', (snap) => {
-        const sys = snap.val() || {}; currentSysState = sys;
-        if (sys.emergencyStop) return; 
-
-        let activeIrr = sys.activeIrrZone || 0; let activeFert = sys.activeFertZone || 0;
-        const hero = document.getElementById('hero-dashboard');
+        currentSysState = snap.val() || {};
         
-        document.getElementById('motor-main-ind').className = sys.pump1Active ? "motor-indicator motor-on m-main" : "motor-indicator";
-        document.getElementById('motor-main-ind').innerHTML = sys.pump1Active ? `<i class="fa-solid fa-water"></i> Main Pump: ON` : `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
-        document.getElementById('motor-fert-ind').className = sys.fertPumpActive ? "motor-indicator motor-on m-fert" : "motor-indicator";
-        document.getElementById('motor-fert-ind').innerHTML = sys.fertPumpActive ? `<i class="fa-solid fa-flask"></i> Fert Pump: ON` : `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
-
-        if (currentInterlockReason === 0) {
-            if (activeIrr > 0 || activeFert > 0) { hero.className = "telemetry-card telemetry-active"; document.getElementById('hero-title').innerText = (activeIrr > 0 ? `ZONE ${activeIrr} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; } 
-            else { hero.className = "telemetry-card"; document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution."; }
-        } else { document.getElementById('hero-subtitle').innerText = "Monitoring power stability to resume..."; }
-
-        for(let i=1; i<=6; i++) {
-            let toggle = document.getElementById(`toggle-irr-${i}`);
-            let isManualTriggered = (sys.manualIrrZone === i);
-            toggle.checked = isManualTriggered;
-            document.getElementById(`card-irr-${i}`).className = (activeIrr === i) ? "control-card active-irr" : "control-card";
-            document.getElementById(`status-irr-${i}`).innerText = (activeIrr === i) ? "FLOW ACTIVE" : "STANDBY";
-        }
-        
-        let disableFerts = (activeIrr === 0);
-        for(let i=1; i<=4; i++) {
-            let toggle = document.getElementById(`toggle-fert-${i}`);
-            toggle.checked = (sys.manualFertZone === i);
-            toggle.disabled = disableFerts; 
-            let card = document.getElementById(`card-fert-${i}`);
-            if (disableFerts) { card.style.opacity = "0.4"; card.style.pointerEvents = "none"; document.getElementById(`status-fert-${i}`).innerText = "DISABLED"; } 
-            else { card.style.opacity = "1"; card.style.pointerEvents = "auto"; document.getElementById(`status-fert-${i}`).innerText = (activeFert === i) ? "INJECTING" : "STANDBY"; }
-            card.className = (activeFert === i) ? "control-card active-fert" : "control-card";
-        }
+        // Log manual overrides if they happen via Firebase directly
+        let mI = currentSysState.manualIrrZone || 0; let mF = currentSysState.manualFertZone || 0;
+        if(mI !== lastStateIrr && mI > 0) logActivity(`💦 Manual Water: Zone ${mI} Started`);
+        if(mF !== lastStateFert && mF > 0) logActivity(`🧪 Manual Fert: Comp ${mF} Started`);
+        lastStateIrr = mI; lastStateFert = mF;
     });
 
     db.ref('schedules').on('value', (snap) => {
@@ -580,50 +560,145 @@ function initAppListeners() {
         if (!hasSchedules) listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px; font-weight:600;">No schedules configured.</p>`;
     });
 
+    // --- THE MASTER RENDERING CLOCK LOOP ---
     setInterval(() => {
-        let isOnline = (Math.floor(Date.now()/1000) - (currentSysState.heartbeat || 0)) < 25;
+        let sys = currentSysState;
+        if (!sys) return;
+        
+        let nowSec = Math.floor(Date.now() / 1000);
+        let isOnline = (nowSec - (sys.heartbeat || 0)) < 25;
+        
+        // Base States from Firebase
+        let activeIrr = sys.activeIrrZone || 0; 
+        let activeFert = sys.activeFertZone || 0;
+        let manIrr = sys.manualIrrZone || 0;
+        let manFert = sys.manualFertZone || 0;
+        let p1Active = sys.pump1Active === true;
+        let fPumpActive = sys.fertPumpActive === true;
+        let isBw = sys.isBackwashActive === true;
+
+        let irrStop = sys.activeIrrStop || 0;
+        let fertStop = sys.activeFertStop || 0;
+
+        // --- THE FIX: SMART FRONTEND AUTONOMY OVERRIDE ---
+        // If the internet drops, Firebase stops updating. But the dashboard knows exactly 
+        // when the motor physically stops. When the clock hits that time, we manually force the UI to STANDBY.
+        if (irrStop > 0 && nowSec >= irrStop) {
+            activeIrr = 0;
+            manIrr = 0;
+            p1Active = false; // Motor is definitely off
+        }
+        if (fertStop > 0 && nowSec >= fertStop) {
+            activeFert = 0;
+            manFert = 0;
+            fPumpActive = false;
+        }
+        if (sys.emergencyStop) {
+            activeIrr = 0; activeFert = 0; manIrr = 0; manFert = 0; p1Active = false; fPumpActive = false; isBw = false;
+        }
+
+        // Logical Display Handlers
+        let displayIrrZone = activeIrr > 0 ? activeIrr : (manIrr > 0 ? manIrr : 0);
+
+        // 1. CONNECTION UI
         let hb = document.getElementById('heartbeat-display'); let wifiDisplay = document.getElementById('wifi-display');
         let voltUI = document.getElementById('pzem-volt'); let currUI = document.getElementById('pzem-curr'); let powUI  = document.getElementById('pzem-pow');
 
         if(isOnline) {
             hb.className = "connection-status status-online"; hb.innerHTML = `<div class="pulse-dot"></div> ONLINE`;
-            let rssi = currentSysState.rssi || 0; let wifiColor = "var(--text-muted)";
+            let rssi = sys.rssi || 0; let wifiColor = "var(--text-muted)";
             if (rssi < 0) { if (rssi > -60) { wifiColor = "var(--fert-color)"; } else if (rssi > -75) { wifiColor = "var(--warning)"; } else { wifiColor = "var(--danger)"; } wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:${wifiColor}"></i> ${rssi} dBm`; } 
             else { wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi"></i> -- dBm`; }
 
-            if(currentSysState.voltage === undefined || currentSysState.voltage < 0) { 
+            if(sys.voltage === undefined || sys.voltage < 0) { 
                 voltUI.innerHTML = `<span class="power-error" style="font-size:14px;"><i class="fa-solid fa-plug-circle-xmark"></i> SENSOR ERROR</span>`; currUI.innerHTML = `<span style="opacity:0.3;">-- A</span>`; powUI.innerHTML  = `<span style="opacity:0.3;">-- W</span>`; 
             } else {
-                voltUI.innerText = `${parseFloat(currentSysState.voltage).toFixed(1)} V`; currUI.innerText = `${parseFloat(currentSysState.current).toFixed(2)} A`; powUI.innerText  = `${parseFloat(currentSysState.power).toFixed(0)} W`;
-                if (currentSysState.motorConfig && currentSysState.motorConfig.enabled) {
-                    if (currentSysState.voltage < currentSysState.motorConfig.minV || currentSysState.voltage > currentSysState.motorConfig.maxV) voltUI.className = "power-val power-error"; else voltUI.className = "power-val";
-                    if (currentSysState.pump1Active && currentSysState.current >= 0) { if (currentSysState.current < currentSysState.motorConfig.minA || currentSysState.current > currentSysState.motorConfig.maxA) currUI.className = "power-val power-error"; else currUI.className = "power-val"; } else currUI.className = "power-val";
+                voltUI.innerText = `${parseFloat(sys.voltage).toFixed(1)} V`; currUI.innerText = `${parseFloat(sys.current).toFixed(2)} A`; powUI.innerText  = `${parseFloat(sys.power).toFixed(0)} W`;
+                if (sys.motorConfig && sys.motorConfig.enabled) {
+                    if (sys.voltage < sys.motorConfig.minV || sys.voltage > sys.motorConfig.maxV) voltUI.className = "power-val power-error"; else voltUI.className = "power-val";
+                    if (p1Active && sys.current >= 0) { if (sys.current < sys.motorConfig.minA || sys.current > sys.motorConfig.maxA) currUI.className = "power-val power-error"; else currUI.className = "power-val"; } else currUI.className = "power-val";
                 } else { voltUI.className = "power-val"; currUI.className = "power-val"; }
             }
         } else {
             hb.className = "connection-status status-offline"; hb.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`; wifiDisplay.innerHTML = `<i class="fa-solid fa-wifi" style="color:var(--text-muted); opacity:0.4;"></i> <span style="opacity:0.4;">-- dBm</span>`;
             voltUI.innerHTML = `<span class="power-error" style="font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> OFFLINE</span>`; currUI.innerHTML = `<span style="opacity:0.3;">-- A</span>`; powUI.innerHTML  = `<span style="opacity:0.3;">-- W</span>`; voltUI.className = "power-val"; currUI.className = "power-val";
         }
+
+        // 2. HERO DASHBOARD UI
+        const hero = document.getElementById('hero-dashboard');
+        if (currentInterlockReason === 0 && !sys.emergencyStop) {
+            if (isBw) { 
+                hero.className = "telemetry-card telemetry-bw"; 
+                document.getElementById('hero-title').innerText = "BACKWASH ACTIVE"; document.getElementById('hero-title').style.color = "var(--bw-color)"; document.getElementById('hero-subtitle').innerText = "System valves are safely locked."; 
+            } 
+            else if (displayIrrZone > 0 || activeFert > 0) { 
+                hero.className = "telemetry-card telemetry-active"; 
+                document.getElementById('hero-title').innerText = (displayIrrZone > 0 ? `ZONE ${displayIrrZone} ` : "") + (activeFert > 0 ? `| COMP ${activeFert}` : ""); document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Live System Telemetry"; 
+            } 
+            else { 
+                hero.className = "telemetry-card"; 
+                document.getElementById('hero-title').innerText = "STANDBY"; document.getElementById('hero-title').style.color = "var(--text-main)"; document.getElementById('hero-subtitle').innerText = "Awaiting schedule execution."; 
+            }
+        }
+
+        // 3. MOTOR INDICATORS UI
+        document.getElementById('motor-main-ind').className = p1Active ? "motor-indicator motor-on m-main" : "motor-indicator";
+        document.getElementById('motor-main-ind').innerHTML = p1Active ? `<i class="fa-solid fa-water"></i> Main Pump: ON` : `<i class="fa-solid fa-water"></i> Main Pump: OFF`;
+        document.getElementById('motor-fert-ind').className = fPumpActive ? "motor-indicator motor-on m-fert" : "motor-indicator";
+        document.getElementById('motor-fert-ind').innerHTML = fPumpActive ? `<i class="fa-solid fa-flask"></i> Fert Pump: ON` : `<i class="fa-solid fa-flask"></i> Fert Pump: OFF`;
+
+        // 4. LIVE FEED BANNER UI
+        let feed = [];
+        if (isOnline) {
+            feed.push(`<span class="feed-item">🟢 Main Valve ON</span>`);
+            if (p1Active) feed.push(`<span class="feed-item" style="background:var(--primary);">💦 Main Pump Running</span>`);
+            if (fPumpActive) feed.push(`<span class="feed-item" style="background:var(--fert-color);">🧪 Fert Pump Running</span>`);
+            if (displayIrrZone > 0) feed.push(`<span class="feed-item">📍 Zone ${displayIrrZone} Open</span>`);
+            if (activeFert > 0) feed.push(`<span class="feed-item">🧪 Comp ${activeFert} Open</span>`);
+            if(feed.length === 1) feed.push(`<span class="feed-item" style="background:rgba(0,0,0,0.2);">System in Standby</span>`);
+        } else {
+            feed.push(`<span class="feed-item" style="background:var(--danger);">System Offline - Displaying predicted state</span>`);
+        }
+        document.getElementById('live-feed').innerHTML = feed.join('');
+
+        // 5. ZONE CARDS & TOGGLES
+        for(let i=1; i<=6; i++) {
+            let toggle = document.getElementById(`toggle-irr-${i}`);
+            toggle.checked = (manIrr === i);
+            toggle.disabled = isBw;
+            document.getElementById(`card-irr-${i}`).className = (displayIrrZone === i) ? "control-card active-irr" : "control-card";
+            document.getElementById(`status-irr-${i}`).innerText = (displayIrrZone === i) ? "FLOW ACTIVE" : "STANDBY";
+        }
         
-        let logicalIrrZone = currentSysState.activeIrrZone || 0;
-        let activeIrrStop = currentSysState.activeIrrStop || 0;
-        
+        // 6. FERTILIZER CARDS & TOGGLES
+        let disableFerts = (displayIrrZone === 0);
+        for(let i=1; i<=4; i++) {
+            let toggle = document.getElementById(`toggle-fert-${i}`);
+            toggle.checked = (manFert === i);
+            toggle.disabled = disableFerts; 
+            let card = document.getElementById(`card-fert-${i}`);
+            if (disableFerts) { 
+                card.style.opacity = "0.4"; card.style.pointerEvents = "none"; document.getElementById(`status-fert-${i}`).innerText = "DISABLED"; 
+            } else { 
+                card.style.opacity = "1"; card.style.pointerEvents = "auto"; document.getElementById(`status-fert-${i}`).innerText = (activeFert === i) ? "INJECTING" : "STANDBY"; 
+            }
+            card.className = (activeFert === i) ? "control-card active-fert" : "control-card";
+        }
+
+        // 7. LIVE TIMERS UI
         let boxI = document.getElementById('timer-box-irr'); let lblI = document.getElementById('timer-label-irr'); let tmrI = document.getElementById('live-timer-irr');
-        if (logicalIrrZone > 0) {
+        if (displayIrrZone > 0 && !sys.emergencyStop) {
             boxI.style.display = "flex";
-            if (activeIrrStop > 0) { 
-                let rem = Math.max(0, activeIrrStop - Math.floor(Date.now() / 1000));
+            if (irrStop > 0) { 
+                let rem = Math.max(0, irrStop - nowSec);
                 if(rem > 0) {
                     tmrI.innerText = `${Math.floor(rem / 60).toString().padStart(2, '0')}:${(rem % 60).toString().padStart(2, '0')}`;
-                    lblI.innerText = currentInterlockReason > 0 ? `ZONE ${logicalIrrZone} PAUSED` : `ZONE ${logicalIrrZone} REMAINING`; 
+                    lblI.innerText = currentInterlockReason > 0 ? `ZONE ${displayIrrZone} PAUSED` : `ZONE ${displayIrrZone} REMAINING`; 
                     tmrI.style.fontSize = "32px"; tmrI.style.lineHeight = "normal";
-                } else {
-                    lblI.innerText = `ZONE ${logicalIrrZone} FINISHING...`;
-                    tmrI.innerText = "00:00";
                 }
             } 
             else { 
-                lblI.innerText = `ZONE ${logicalIrrZone} ACTIVE`; 
+                lblI.innerText = `ZONE ${displayIrrZone} ACTIVE`; 
                 tmrI.innerText = "CONT."; tmrI.style.fontSize = "22px"; tmrI.style.lineHeight = "38px"; 
             }
         } else { boxI.style.display = "none"; }
